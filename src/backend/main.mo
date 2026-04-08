@@ -253,6 +253,23 @@ actor {
       leadsMap.add(k, newLead);
     };
     leads.clear();
+    // Ensure default admin account always exists after every upgrade
+    switch (users.get("admin")) {
+      case null {
+        users.add("admin", {
+          userId       = "admin";
+          passwordHash = "Admin@1234";
+          name         = "Administrator";
+          role         = #admin;
+          district     = "";
+          phone        = "";
+          email        = "";
+          whatsAppNumber = "";
+          isActive     = true;
+        });
+      };
+      case (?_) {}; // admin already exists, leave it untouched
+    };
   };
 
   // ─────────────────────────────────────────────
@@ -396,13 +413,15 @@ actor {
   // ─────────────────────────────────────────────
 
   public shared func login(username : Text, password : Text) : async { #ok : Text; #err : Text } {
-    switch (users.get(username)) {
+    let trimmedUsername = username.trim(#predicate(func(c : Char) : Bool { c == ' ' or c == '\t' or c == '\n' or c == '\r' }));
+    let trimmedPassword = password.trim(#predicate(func(c : Char) : Bool { c == ' ' or c == '\t' or c == '\n' or c == '\r' }));
+    switch (users.get(trimmedUsername)) {
       case null { #err("Invalid username or password") };
       case (?u) {
         if (not u.isActive) { return #err("Account is inactive. Contact admin.") };
-        if (u.passwordHash != password) { return #err("Invalid username or password") };
-        let token = generateToken(username);
-        let sd : SessionData = { userId = username; createdAt = Time.now() };
+        if (u.passwordHash != trimmedPassword) { return #err("Invalid username or password") };
+        let token = generateToken(trimmedUsername);
+        let sd : SessionData = { userId = trimmedUsername; createdAt = Time.now() };
         sessions.add(token, sd);
         #ok(token);
       };

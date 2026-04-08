@@ -1,8 +1,4 @@
 import { Toaster } from "@/components/ui/sonner";
-import {
-  InternetIdentityProvider,
-  useActor,
-} from "@caffeineai/core-infrastructure";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -11,9 +7,8 @@ import {
   createRoute,
   createRouter,
 } from "@tanstack/react-router";
-import { AlertTriangle, RefreshCw, Sun } from "lucide-react";
-import { Component, type ErrorInfo, type ReactNode } from "react";
-import { createActor } from "./backend";
+import { Sun } from "lucide-react";
+import { Component, type ReactNode, useEffect, useRef, useState } from "react";
 import { useAuth } from "./hooks/useAuth";
 import Assignments from "./pages/Assignments";
 import Dashboard from "./pages/Dashboard";
@@ -27,7 +22,6 @@ import UsersPage from "./pages/Users";
 
 interface ErrorBoundaryState {
   hasError: boolean;
-  error: Error | null;
 }
 
 class AppErrorBoundary extends Component<
@@ -36,106 +30,62 @@ class AppErrorBoundary extends Component<
 > {
   constructor(props: { children: ReactNode }) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("App error:", error, info);
+  componentDidCatch(error: Error) {
+    console.error("App error:", error);
   }
 
   render() {
     if (this.state.hasError) {
-      return (
-        <div
-          className="min-h-screen flex items-center justify-center p-6"
-          style={{ background: "oklch(0.12 0.022 240)" }}
-        >
-          <div className="max-w-md w-full text-center">
-            <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 rounded-full bg-destructive/10 border border-destructive/30 flex items-center justify-center">
-                <AlertTriangle className="w-8 h-8 text-destructive" />
-              </div>
-            </div>
-            <h1
-              className="text-xl font-bold mb-2"
-              style={{ color: "oklch(0.92 0.01 230)" }}
-            >
-              Adishakti Solar CRM
-            </h1>
-            <p
-              className="text-sm mb-1"
-              style={{ color: "oklch(0.6 0.03 230)" }}
-            >
-              Something went wrong loading the application.
-            </p>
-            {this.state.error && (
-              <p
-                className="text-xs mb-6 font-mono"
-                style={{ color: "oklch(0.5 0.03 230)" }}
-              >
-                {this.state.error.message}
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => window.location.reload()}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium"
-              style={{
-                background: "oklch(0.75 0.14 68)",
-                color: "oklch(0.12 0.022 240)",
-              }}
-            >
-              <RefreshCw className="w-4 h-4" />
-              Reload Page
-            </button>
-          </div>
-        </div>
-      );
+      // Always show Login instead of a black error screen.
+      // This ensures auth/actor init failures never block the user.
+      return <Login />;
+    }
+    return this.props.children;
+  }
+}
+
+// ── Auth Error Boundary ──────────────────────────────────────────────────────
+// Catches actor initialization errors (e.g. invalid canisterId "undefined")
+// and falls back to Login page instead of showing a crash screen.
+
+class AuthErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error) {
+    console.warn("Auth/Actor init error (showing login):", error.message);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return <Login />;
     }
     return this.props.children;
   }
 }
 
 // ── Route Error ──────────────────────────────────────────────────────────────
+// Renders on TanStack Router route-level errors.
+// Shows Login instead of a black "Page Error" screen so users are never stuck.
 
 function RouteError() {
-  return (
-    <div
-      className="min-h-screen flex items-center justify-center p-6"
-      style={{ background: "oklch(0.12 0.022 240)" }}
-    >
-      <div className="max-w-md w-full text-center">
-        <div className="flex justify-center mb-4">
-          <AlertTriangle className="w-10 h-10 text-destructive" />
-        </div>
-        <h2
-          className="text-lg font-bold mb-2"
-          style={{ color: "oklch(0.92 0.01 230)" }}
-        >
-          Page Error
-        </h2>
-        <p className="text-sm mb-4" style={{ color: "oklch(0.6 0.03 230)" }}>
-          An unexpected error occurred on this page.
-        </p>
-        <button
-          type="button"
-          onClick={() => window.location.replace("/")}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium"
-          style={{
-            background: "oklch(0.75 0.14 68)",
-            color: "oklch(0.12 0.022 240)",
-          }}
-        >
-          <RefreshCw className="w-4 h-4" />
-          Go to Dashboard
-        </button>
-      </div>
-    </div>
-  );
+  return <Login />;
 }
 
 // ── Loading Screen ──────────────────────────────────────────────────────────
@@ -169,11 +119,29 @@ function LoadingScreen() {
 
 // ── Auth Gate ───────────────────────────────────────────────────────────────
 
-function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isFetching: actorLoading } = useActor(createActor);
-  const { sessionToken, profile, isLoading } = useAuth();
+// Max time to wait for backend to initialize before showing login anyway
+const ACTOR_TIMEOUT_MS = 4000;
 
-  if (actorLoading || isLoading) return <LoadingScreen />;
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { sessionToken, profile, isLoading } = useAuth();
+  const [timedOut, setTimedOut] = useState(false);
+  const timerFiredRef = useRef(false);
+
+  // Safety timeout — fires ONCE on mount; never resets so loading can't loop
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (timerFiredRef.current) return;
+    const timer = setTimeout(() => {
+      timerFiredRef.current = true;
+      setTimedOut(true);
+    }, ACTOR_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Still loading AND haven't timed out yet → show loading screen
+  if (isLoading && !timedOut) return <LoadingScreen />;
+
+  // Not authenticated → show login
   if (!sessionToken || !profile) return <Login />;
 
   return <>{children}</>;
@@ -195,9 +163,11 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   component: () => (
-    <AuthGate>
-      <Dashboard />
-    </AuthGate>
+    <AuthErrorBoundary>
+      <AuthGate>
+        <Dashboard />
+      </AuthGate>
+    </AuthErrorBoundary>
   ),
 });
 
@@ -205,9 +175,11 @@ const leadsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/leads",
   component: () => (
-    <AuthGate>
-      <Leads />
-    </AuthGate>
+    <AuthErrorBoundary>
+      <AuthGate>
+        <Leads />
+      </AuthGate>
+    </AuthErrorBoundary>
   ),
 });
 
@@ -215,9 +187,11 @@ const pipelineRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/pipeline",
   component: () => (
-    <AuthGate>
-      <Pipeline />
-    </AuthGate>
+    <AuthErrorBoundary>
+      <AuthGate>
+        <Pipeline />
+      </AuthGate>
+    </AuthErrorBoundary>
   ),
 });
 
@@ -225,9 +199,11 @@ const assignmentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/assignments",
   component: () => (
-    <AuthGate>
-      <Assignments />
-    </AuthGate>
+    <AuthErrorBoundary>
+      <AuthGate>
+        <Assignments />
+      </AuthGate>
+    </AuthErrorBoundary>
   ),
 });
 
@@ -235,9 +211,11 @@ const reportsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/reports",
   component: () => (
-    <AuthGate>
-      <Reports />
-    </AuthGate>
+    <AuthErrorBoundary>
+      <AuthGate>
+        <Reports />
+      </AuthGate>
+    </AuthErrorBoundary>
   ),
 });
 
@@ -245,16 +223,22 @@ const usersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/users",
   component: () => (
-    <AuthGate>
-      <UsersPage />
-    </AuthGate>
+    <AuthErrorBoundary>
+      <AuthGate>
+        <UsersPage />
+      </AuthGate>
+    </AuthErrorBoundary>
   ),
 });
 
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/login",
-  component: Login,
+  component: () => (
+    <AuthErrorBoundary>
+      <Login />
+    </AuthErrorBoundary>
+  ),
 });
 
 const routeTree = rootRoute.addChildren([
@@ -275,15 +259,23 @@ declare module "@tanstack/react-router" {
   }
 }
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Disable automatic background refetches that can cause flickering
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      // Don't retry failed queries automatically — invalid config won't fix itself
+      retry: false,
+    },
+  },
+});
 
 export default function App() {
   return (
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <InternetIdentityProvider>
-          <RouterProvider router={router} />
-        </InternetIdentityProvider>
+        <RouterProvider router={router} />
       </QueryClientProvider>
     </AppErrorBoundary>
   );

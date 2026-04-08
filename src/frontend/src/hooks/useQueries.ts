@@ -1,4 +1,4 @@
-import { useActor } from "@caffeineai/core-infrastructure";
+import { createActorWithConfig } from "@caffeineai/core-infrastructure";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   Lead,
@@ -10,6 +10,35 @@ import type {
 import { createActor } from "../backend";
 import type { Quotation, QuotationInput, QuotationStatus } from "../types";
 
+// ── Safe Actor ─────────────────────────────────────────────────────────────
+// NEVER use useActor() from @caffeineai/core-infrastructure — it calls
+// useInternetIdentity() which throws synchronously when InternetIdentityProvider
+// is absent. Instead, call createActorWithConfig directly via React Query.
+// The queryKey ["crm_actor"] is SHARED with useAuth.ts — so the actor is
+// created once and reused across all hooks (React Query deduplicates the call).
+
+function useSafeActor() {
+  const actorQuery = useQuery({
+    queryKey: ["crm_actor"],
+    queryFn: async () => {
+      try {
+        const actor = await createActorWithConfig(createActor);
+        return actor ?? null;
+      } catch (err) {
+        console.warn("Actor init failed:", err);
+        return null;
+      }
+    },
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+  });
+
+  return {
+    actor: actorQuery.data ?? null,
+    isFetching: actorQuery.isFetching,
+  };
+}
+
 // ── Auth helpers ───────────────────────────────────────────────────────────
 
 function getToken(): string {
@@ -19,7 +48,7 @@ function getToken(): string {
 // ── Leads ──────────────────────────────────────────────────────────────────
 
 export function useAllLeads() {
-  const { actor, isFetching } = useActor(createActor);
+  const { actor, isFetching } = useSafeActor();
   const token = getToken();
   return useQuery<Lead[]>({
     queryKey: ["leads"],
@@ -33,7 +62,7 @@ export function useAllLeads() {
 }
 
 export function useMyLeads() {
-  const { actor, isFetching } = useActor(createActor);
+  const { actor, isFetching } = useSafeActor();
   const token = getToken();
   return useQuery<Lead[]>({
     queryKey: ["leads", "mine"],
@@ -47,7 +76,7 @@ export function useMyLeads() {
 }
 
 export function useTotalLeadsCount() {
-  const { actor, isFetching } = useActor(createActor);
+  const { actor, isFetching } = useSafeActor();
   const token = getToken();
   return useQuery<bigint>({
     queryKey: ["leads", "total"],
@@ -61,7 +90,7 @@ export function useTotalLeadsCount() {
 }
 
 export function useLeadsAddedToday() {
-  const { actor, isFetching } = useActor(createActor);
+  const { actor, isFetching } = useSafeActor();
   const token = getToken();
   return useQuery<bigint>({
     queryKey: ["leads", "today"],
@@ -75,7 +104,7 @@ export function useLeadsAddedToday() {
 }
 
 export function useLeadsByStageCount() {
-  const { actor, isFetching } = useActor(createActor);
+  const { actor, isFetching } = useSafeActor();
   const token = getToken();
   return useQuery<Array<[PipelineStage, bigint]>>({
     queryKey: ["leads", "stageCount"],
@@ -91,7 +120,7 @@ export function useLeadsByStageCount() {
 // ── Lead Mutations ─────────────────────────────────────────────────────────
 
 export function useAddLead() {
-  const { actor } = useActor(createActor);
+  const { actor } = useSafeActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: {
@@ -125,7 +154,7 @@ export function useAddLead() {
 }
 
 export function useUpdateLead() {
-  const { actor } = useActor(createActor);
+  const { actor } = useSafeActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: {
@@ -161,7 +190,7 @@ export function useUpdateLead() {
 }
 
 export function useUpdateLeadStage() {
-  const { actor } = useActor(createActor);
+  const { actor } = useSafeActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: {
@@ -187,7 +216,7 @@ export function useUpdateLeadStage() {
 }
 
 export function useAssignLeadToSales() {
-  const { actor } = useActor(createActor);
+  const { actor } = useSafeActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: { leadId: bigint; salesUserId: string }) => {
@@ -208,7 +237,7 @@ export function useAssignLeadToSales() {
 }
 
 export function useAssignLeadToOperations() {
-  const { actor } = useActor(createActor);
+  const { actor } = useSafeActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: {
@@ -232,7 +261,7 @@ export function useAssignLeadToOperations() {
 }
 
 export function useAddRemark() {
-  const { actor } = useActor(createActor);
+  const { actor } = useSafeActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: { leadId: bigint; content: string }) => {
@@ -251,7 +280,7 @@ export function useAddRemark() {
 // ── Districts ──────────────────────────────────────────────────────────────
 
 export function useAllDistricts() {
-  const { actor, isFetching } = useActor(createActor);
+  const { actor, isFetching } = useSafeActor();
   return useQuery<string[]>({
     queryKey: ["districts"],
     queryFn: async () => {
@@ -265,7 +294,7 @@ export function useAllDistricts() {
 // ── Users ──────────────────────────────────────────────────────────────────
 
 export function useAllUsers() {
-  const { actor, isFetching } = useActor(createActor);
+  const { actor, isFetching } = useSafeActor();
   const token = getToken();
   return useQuery<UserProfile[]>({
     queryKey: ["users"],
@@ -279,7 +308,7 @@ export function useAllUsers() {
 }
 
 export function useCreateUser() {
-  const { actor } = useActor(createActor);
+  const { actor } = useSafeActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: {
@@ -314,7 +343,7 @@ export function useCreateUser() {
 }
 
 export function useUpdateUser() {
-  const { actor } = useActor(createActor);
+  const { actor } = useSafeActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: {
@@ -347,7 +376,7 @@ export function useUpdateUser() {
 }
 
 export function useChangePassword() {
-  const { actor } = useActor(createActor);
+  const { actor } = useSafeActor();
   return useMutation({
     mutationFn: async (params: { userId: string; newPassword: string }) => {
       if (!actor) throw new Error("Not connected");
@@ -365,7 +394,7 @@ export function useChangePassword() {
 // ── Delete Mutations ───────────────────────────────────────────────────────
 
 export function useDeleteLead() {
-  const { actor } = useActor(createActor);
+  const { actor } = useSafeActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (leadId: bigint) => {
@@ -382,7 +411,7 @@ export function useDeleteLead() {
 }
 
 export function useDeleteUser() {
-  const { actor } = useActor(createActor);
+  const { actor } = useSafeActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (userId: string) => {
@@ -445,7 +474,7 @@ function mapQuotation(q: any): Quotation {
 }
 
 export function useQuotationsByLead(leadId: string) {
-  const { actor, isFetching } = useActor(createActor);
+  const { actor, isFetching } = useSafeActor();
   const token = getToken();
   return useQuery<Quotation[]>({
     queryKey: ["quotations", leadId],
@@ -461,7 +490,7 @@ export function useQuotationsByLead(leadId: string) {
 }
 
 export function useCreateQuotation() {
-  const { actor } = useActor(createActor);
+  const { actor } = useSafeActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: { leadId: string; input: QuotationInput }) => {
@@ -483,7 +512,7 @@ export function useCreateQuotation() {
 }
 
 export function useUpdateQuotation() {
-  const { actor } = useActor(createActor);
+  const { actor } = useSafeActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: {
@@ -509,7 +538,7 @@ export function useUpdateQuotation() {
 }
 
 export function useUpdateQuotationStatus() {
-  const { actor } = useActor(createActor);
+  const { actor } = useSafeActor();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: {

@@ -1,16 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useActor } from "@caffeineai/core-infrastructure";
-import { Loader2, Lock, Sun } from "lucide-react";
+import { Loader2, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { createActor } from "../backend";
 import { useAuth } from "../hooks/useAuth";
 
 export default function Login() {
   const { login, sessionToken, profile } = useAuth();
-  const { isFetching: actorLoading } = useActor(createActor);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -32,7 +29,7 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      const err = await login(username.trim(), password);
+      const err = await login(username.trim(), password.trim());
       if (err) {
         setError("Invalid username or password");
       } else {
@@ -130,7 +127,7 @@ export default function Login() {
             <Button
               type="submit"
               className="w-full bg-gold text-[#0A1220] hover:bg-gold/90 font-bold text-sm mt-1"
-              disabled={loading || actorLoading}
+              disabled={loading}
               data-ocid="login.primary_button"
             >
               {loading ? (
