@@ -1,3 +1,10 @@
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import type { Lead } from "../backend";
@@ -16,6 +23,7 @@ import {
   useUpdateLeadStage,
 } from "../hooks/useQueries";
 import {
+  DEFAULT_DISTRICTS,
   PIPELINE_STAGES,
   PipelineStage,
   STAGE_COLORS,
@@ -38,6 +46,8 @@ export default function Pipeline() {
 
   const salesUsers = users.filter((u) => u.role === UserRole.sales);
 
+  const allDistricts = districts.length > 0 ? districts : DEFAULT_DISTRICTS;
+
   const filteredLeads = selectedDistrict
     ? allLeads.filter((l) => l.district === selectedDistrict)
     : allLeads;
@@ -45,6 +55,7 @@ export default function Pipeline() {
   const leadsByStage: Record<PipelineStage, Lead[]> = {
     [PipelineStage.inquiry]: [],
     [PipelineStage.surveyScheduled]: [],
+    [PipelineStage.quotationSent]: [],
     [PipelineStage.bookingConfirmed]: [],
     [PipelineStage.installation]: [],
     [PipelineStage.closedWon]: [],
@@ -65,10 +76,37 @@ export default function Pipeline() {
         <h1 className="text-2xl font-extrabold tracking-tight text-foreground uppercase">
           Pipeline
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Full kanban pipeline — {filteredLeads.length} total leads
-          {selectedDistrict ? ` in ${selectedDistrict}` : ""}
-        </p>
+        <div className="flex items-center justify-between gap-3 mt-2 flex-wrap">
+          <p className="text-sm text-muted-foreground">
+            Full kanban pipeline — {filteredLeads.length} total leads
+            {selectedDistrict ? ` in ${selectedDistrict}` : ""}
+          </p>
+          <Select
+            value={selectedDistrict ?? "all"}
+            onValueChange={(v) => setSelectedDistrict(v === "all" ? null : v)}
+          >
+            <SelectTrigger
+              className="w-44 bg-muted border-border text-foreground h-8 text-xs"
+              data-ocid="pipeline.district.select"
+            >
+              <SelectValue placeholder="All Districts" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border-border max-h-60 overflow-y-auto">
+              <SelectItem value="all" className="text-foreground text-xs">
+                All Districts
+              </SelectItem>
+              {allDistricts.map((d) => (
+                <SelectItem
+                  key={d}
+                  value={d}
+                  className="text-foreground text-xs"
+                >
+                  {d}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="flex gap-3 overflow-x-auto pb-4">

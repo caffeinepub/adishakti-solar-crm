@@ -5,7 +5,16 @@ type Int__270357528 = Int__616954475;
 type Int__616954475 = Int;
 type Internal__8484328<K, V> =
   {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
-type Lead__21276013 =
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type Map__158565046<K, V> = Map__297112838<K, V>;
+type Map__297112838<K, V> =
+  {var root : Node__46230540<K, V>; var size : Nat__490723111};
+type Map__605269027<K, V> = Map__158565046<K, V>;
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type OldLead__803602815 =
   {
     address : Text;
     assignedOperationsPerson : ?Text;
@@ -20,19 +29,10 @@ type Lead__21276013 =
     phone : Text;
     remarks : [Remark__267946969];
     requirements : Requirement__404759958;
-    stage : PipelineStage__644919044;
+    stage : OldPipelineStage__1069416066;
     updatedAt : Time__900049286
   };
-type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
-type Map__158565046<K, V> = Map__297112838<K, V>;
-type Map__297112838<K, V> =
-  {var root : Node__46230540<K, V>; var size : Nat__490723111};
-type Map__605269027<K, V> = Map__158565046<K, V>;
-type Nat__490723111 = Nat__920180692;
-type Nat__920180692 = Nat;
-type Node__46230540<K, V> =
-  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
-type PipelineStage__644919044 =
+type OldPipelineStage__1069416066 =
   {
     #bookingConfirmed;
     #closedLost;
@@ -106,7 +106,7 @@ actor {
     };
   stable leads :
     {
-      var root : Node__46230540<Nat, Lead__21276013>;
+      var root : Node__46230540<Nat, OldLead__803602815>;
       var size : Nat__490723111
     };
   stable var nextLeadId : Nat;

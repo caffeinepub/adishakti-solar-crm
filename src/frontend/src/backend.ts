@@ -170,6 +170,7 @@ export enum PipelineStage {
     inquiry = "inquiry",
     bookingConfirmed = "bookingConfirmed",
     surveyScheduled = "surveyScheduled",
+    quotationSent = "quotationSent",
     installation = "installation",
     closedLost = "closedLost"
 }
@@ -1552,11 +1553,13 @@ function from_candid_variant_n5(_uploadFile: (file: ExternalBlob) => Promise<Uin
 } | {
     surveyScheduled: null;
 } | {
+    quotationSent: null;
+} | {
     installation: null;
 } | {
     closedLost: null;
 }): PipelineStage {
-    return "closedWon" in value ? PipelineStage.closedWon : "inquiry" in value ? PipelineStage.inquiry : "bookingConfirmed" in value ? PipelineStage.bookingConfirmed : "surveyScheduled" in value ? PipelineStage.surveyScheduled : "installation" in value ? PipelineStage.installation : "closedLost" in value ? PipelineStage.closedLost : value;
+    return "closedWon" in value ? PipelineStage.closedWon : "inquiry" in value ? PipelineStage.inquiry : "bookingConfirmed" in value ? PipelineStage.bookingConfirmed : "surveyScheduled" in value ? PipelineStage.surveyScheduled : "quotationSent" in value ? PipelineStage.quotationSent : "installation" in value ? PipelineStage.installation : "closedLost" in value ? PipelineStage.closedLost : value;
 }
 function from_candid_variant_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     ok: null;
@@ -1629,6 +1632,8 @@ function to_candid_variant_n33(_uploadFile: (file: ExternalBlob) => Promise<Uint
 } | {
     surveyScheduled: null;
 } | {
+    quotationSent: null;
+} | {
     installation: null;
 } | {
     closedLost: null;
@@ -1641,6 +1646,8 @@ function to_candid_variant_n33(_uploadFile: (file: ExternalBlob) => Promise<Uint
         bookingConfirmed: null
     } : value == PipelineStage.surveyScheduled ? {
         surveyScheduled: null
+    } : value == PipelineStage.quotationSent ? {
+        quotationSent: null
     } : value == PipelineStage.installation ? {
         installation: null
     } : value == PipelineStage.closedLost ? {

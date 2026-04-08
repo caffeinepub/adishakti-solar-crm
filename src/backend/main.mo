@@ -55,6 +55,7 @@ actor {
   public type PipelineStage = {
     #inquiry;
     #surveyScheduled;
+    #quotationSent;
     #bookingConfirmed;
     #installation;
     #closedWon;
@@ -136,15 +137,123 @@ actor {
   };
 
   // ─────────────────────────────────────────────
+  //  MIGRATION TYPES (old schema — 6-stage pipeline)
+  // ─────────────────────────────────────────────
+
+  type OldPipelineStage = {
+    #inquiry;
+    #surveyScheduled;
+    #bookingConfirmed;
+    #installation;
+    #closedWon;
+    #closedLost;
+  };
+
+  type OldLead = {
+    id                      : Nat;
+    customerName            : Text;
+    phone                   : Text;
+    email                   : Text;
+    address                 : Text;
+    district                : Text;
+    requirements            : Requirement;
+    assignedSalesPerson     : ?Text;
+    assignedOperationsPerson : ?Text;
+    createdBy               : Text;
+    createdAt               : Time.Time;
+    updatedAt               : Time.Time;
+    stage                   : OldPipelineStage;
+    notes                   : Text;
+    remarks                 : [Remark];
+  };
+
+  func migrateStage(old : OldPipelineStage) : PipelineStage {
+    switch old {
+      case (#inquiry)          { #inquiry };
+      case (#surveyScheduled)  { #surveyScheduled };
+      case (#bookingConfirmed) { #bookingConfirmed };
+      case (#installation)     { #installation };
+      case (#closedWon)        { #closedWon };
+      case (#closedLost)       { #closedLost };
+    };
+  };
+
+  // ─────────────────────────────────────────────
   //  STATE
   // ─────────────────────────────────────────────
 
   let users       = Map.empty<Text, UserProfile>();
   let sessions    = Map.empty<Text, SessionData>();
-  let leads       = Map.empty<Nat, Lead>();
+  // leads stores OldLead (compatible with pre-quotationSent snapshot) for stable persistence
+  let leads       = Map.empty<Nat, OldLead>();
   let quotations  = Map.empty<Text, Quotation>();
   var nextLeadId       : Nat = 1;
   var nextQuotationSeq : Nat = 1;
+
+  // Working map with new Lead type (rebuilt from leads in postupgrade)
+  flexible var leadsMap = Map.empty<Nat, Lead>();
+
+  // ─────────────────────────────────────────────
+  //  UPGRADE HOOKS
+  // ─────────────────────────────────────────────
+
+  system func preupgrade() {
+    // Serialize leadsMap back to leads (as OldLead, dropping quotationSent → surveyScheduled for compat)
+    for ((k, l) in leadsMap.entries()) {
+      let oldStage : OldPipelineStage = switch (l.stage) {
+        case (#inquiry)          { #inquiry };
+        case (#surveyScheduled)  { #surveyScheduled };
+        case (#quotationSent)    { #surveyScheduled }; // map back to nearest stage for old snapshot
+        case (#bookingConfirmed) { #bookingConfirmed };
+        case (#installation)     { #installation };
+        case (#closedWon)        { #closedWon };
+        case (#closedLost)       { #closedLost };
+      };
+      let ol : OldLead = {
+        id                       = l.id;
+        customerName             = l.customerName;
+        phone                    = l.phone;
+        email                    = l.email;
+        address                  = l.address;
+        district                 = l.district;
+        requirements             = l.requirements;
+        assignedSalesPerson      = l.assignedSalesPerson;
+        assignedOperationsPerson = l.assignedOperationsPerson;
+        createdBy                = l.createdBy;
+        createdAt                = l.createdAt;
+        updatedAt                = l.updatedAt;
+        stage                    = oldStage;
+        notes                    = l.notes;
+        remarks                  = l.remarks;
+      };
+      leads.add(k, ol);
+    };
+  };
+
+  system func postupgrade() {
+    leadsMap := Map.empty<Nat, Lead>();
+    for ((k, oldLead) in leads.entries()) {
+      let newLead : Lead = {
+        id                       = oldLead.id;
+        customerName             = oldLead.customerName;
+        phone                    = oldLead.phone;
+        email                    = oldLead.email;
+        address                  = oldLead.address;
+        district                 = oldLead.district;
+        requirements             = oldLead.requirements;
+        assignedSalesPerson      = oldLead.assignedSalesPerson;
+        assignedOperationsPerson = oldLead.assignedOperationsPerson;
+        createdBy                = oldLead.createdBy;
+        createdAt                = oldLead.createdAt;
+        updatedAt                = oldLead.updatedAt;
+        stage                    = migrateStage(oldLead.stage);
+        notes                    = oldLead.notes;
+        remarks                  = oldLead.remarks;
+      };
+      leadsMap.add(k, newLead);
+    };
+    leads.clear();
+  };
 
   // ─────────────────────────────────────────────
   //  DISTRICTS — fixed, Odisha-only
@@ -429,7 +538,7 @@ actor {
       stage     = #inquiry;
       remarks   = [];
     };
-    leads.add(id, lead);
+    leadsMap.add(id, lead);
     #ok(lead);
   };
 
@@ -445,7 +554,7 @@ actor {
     notes         : Text
   ) : async { #ok : Lead; #err : Text } {
     let caller = requireSession(sessionToken);
-    switch (leads.get(leadId)) {
+    switch (leadsMap.get(leadId)) {
       case null { #err("Lead not found") };
       case (?existing) {
         if (not canModifyLead(caller.userId, caller.role, existing)) {
@@ -457,7 +566,7 @@ actor {
           requirements; notes;
           updatedAt = Time.now();
         };
-        leads.add(leadId, updated);
+        leadsMap.add(leadId, updated);
         #ok(updated);
       };
     };
@@ -470,7 +579,7 @@ actor {
     notes        : Text
   ) : async { #ok : Lead; #err : Text } {
     let caller = requireSession(sessionToken);
-    switch (leads.get(leadId)) {
+    switch (leadsMap.get(leadId)) {
       case null { #err("Lead not found") };
       case (?existing) {
         if (not canModifyLead(caller.userId, caller.role, existing)) {
@@ -479,7 +588,7 @@ actor {
         let updated : Lead = {
           existing with stage; notes; updatedAt = Time.now();
         };
-        leads.add(leadId, updated);
+        leadsMap.add(leadId, updated);
         #ok(updated);
       };
     };
@@ -503,7 +612,7 @@ actor {
         };
       };
     };
-    switch (leads.get(leadId)) {
+    switch (leadsMap.get(leadId)) {
       case null { #err("Lead not found") };
       case (?existing) {
         let updated : Lead = {
@@ -511,7 +620,7 @@ actor {
           assignedSalesPerson = ?salesUserId;
           updatedAt = Time.now();
         };
-        leads.add(leadId, updated);
+        leadsMap.add(leadId, updated);
         #ok(updated);
       };
     };
@@ -535,7 +644,7 @@ actor {
         };
       };
     };
-    switch (leads.get(leadId)) {
+    switch (leadsMap.get(leadId)) {
       case null { #err("Lead not found") };
       case (?existing) {
         let updated : Lead = {
@@ -543,7 +652,7 @@ actor {
           assignedOperationsPerson = ?operationsUserId;
           updatedAt = Time.now();
         };
-        leads.add(leadId, updated);
+        leadsMap.add(leadId, updated);
         #ok(updated);
       };
     };
@@ -551,7 +660,7 @@ actor {
 
   public query func getLeadById(sessionToken : Text, leadId : Nat) : async { #ok : Lead; #err : Text } {
     let caller = requireSession(sessionToken);
-    switch (leads.get(leadId)) {
+    switch (leadsMap.get(leadId)) {
       case null { #err("Lead not found") };
       case (?lead) {
         if (not canAccessLead(caller.userId, caller.role, lead)) {
@@ -567,16 +676,16 @@ actor {
     if (not canViewAllLeads(caller.role)) {
       return #err("Unauthorized: only admin, backoffice, and operation can view all leads");
     };
-    #ok(leads.values().toArray());
+    #ok(leadsMap.values().toArray());
   };
 
   public query func getMyLeads(sessionToken : Text) : async { #ok : [Lead]; #err : Text } {
     let caller = requireSession(sessionToken);
     if (canViewAllLeads(caller.role)) {
-      return #ok(leads.values().toArray());
+      return #ok(leadsMap.values().toArray());
     };
     // Sales — return only assigned leads
-    let mine = leads.values().toArray().filter(func(l : Lead) : Bool {
+    let mine = leadsMap.values().toArray().filter(func(l : Lead) : Bool {
       l.assignedSalesPerson == ?caller.userId or l.createdBy == caller.userId
     });
     #ok(mine);
@@ -587,7 +696,7 @@ actor {
     if (not canViewAllLeads(caller.role)) {
       return #err("Unauthorized: only admin, backoffice, and operation can filter by district");
     };
-    #ok(leads.values().toArray().filter(func(l : Lead) : Bool { Text.equal(l.district, district) }));
+    #ok(leadsMap.values().toArray().filter(func(l : Lead) : Bool { Text.equal(l.district, district) }));
   };
 
   public query func getLeadsByStage(sessionToken : Text, stage : PipelineStage) : async { #ok : [Lead]; #err : Text } {
@@ -595,7 +704,7 @@ actor {
     if (not canViewAllLeads(caller.role)) {
       return #err("Unauthorized: only admin, backoffice, and operation can filter by stage");
     };
-    #ok(leads.values().toArray().filter(func(l : Lead) : Bool { l.stage == stage }));
+    #ok(leadsMap.values().toArray().filter(func(l : Lead) : Bool { l.stage == stage }));
   };
 
   public query func getTotalLeadsCount(sessionToken : Text) : async { #ok : Nat; #err : Text } {
@@ -603,7 +712,7 @@ actor {
     if (not canViewAllLeads(caller.role)) {
       return #err("Unauthorized: admin, backoffice, or operation access required");
     };
-    #ok(leads.size());
+    #ok(leadsMap.size());
   };
 
   public query func getLeadsAddedToday(sessionToken : Text) : async { #ok : Nat; #err : Text } {
@@ -614,7 +723,7 @@ actor {
     let now = Time.now();
     let oneDayNanos : Int = 24 * 60 * 60 * 1_000_000_000;
     let todayStart  : Int = now - oneDayNanos;
-    let count = leads.values().toArray().filter(func(l : Lead) : Bool {
+    let count = leadsMap.values().toArray().filter(func(l : Lead) : Bool {
       l.createdAt >= todayStart
     }).size();
     #ok(count);
@@ -625,10 +734,11 @@ actor {
     if (not canViewAllLeads(caller.role)) {
       return #err("Unauthorized: admin, backoffice, or operation access required");
     };
-    let all = leads.values().toArray();
+    let all = leadsMap.values().toArray();
     #ok([
       (#inquiry,          all.filter(func(l : Lead) : Bool { l.stage == #inquiry          }).size()),
       (#surveyScheduled,  all.filter(func(l : Lead) : Bool { l.stage == #surveyScheduled  }).size()),
+      (#quotationSent,    all.filter(func(l : Lead) : Bool { l.stage == #quotationSent    }).size()),
       (#bookingConfirmed, all.filter(func(l : Lead) : Bool { l.stage == #bookingConfirmed }).size()),
       (#installation,     all.filter(func(l : Lead) : Bool { l.stage == #installation     }).size()),
       (#closedWon,        all.filter(func(l : Lead) : Bool { l.stage == #closedWon        }).size()),
@@ -641,7 +751,7 @@ actor {
     if (not canViewAllLeads(caller.role)) {
       return #err("Unauthorized: admin, backoffice, or operation access required");
     };
-    let all = leads.values().toArray();
+    let all = leadsMap.values().toArray();
     #ok(
       odishaDistricts.map<Text, (Text, Nat)>(func(d : Text) : (Text, Nat) {
         (d, all.filter(func(l : Lead) : Bool { Text.equal(l.district, d) }).size())
@@ -659,7 +769,7 @@ actor {
     content      : Text
   ) : async { #ok : Lead; #err : Text } {
     let caller = requireSession(sessionToken);
-    switch (leads.get(leadId)) {
+    switch (leadsMap.get(leadId)) {
       case null { #err("Lead not found") };
       case (?existing) {
         if (not canAccessLead(caller.userId, caller.role, existing)) {
@@ -677,7 +787,7 @@ actor {
           remarks   = updatedRemarks;
           updatedAt = Time.now();
         };
-        leads.add(leadId, updated);
+        leadsMap.add(leadId, updated);
         #ok(updated);
       };
     };
@@ -822,11 +932,11 @@ actor {
     if (caller.role != #admin) {
       return #err("Unauthorized: only admin can delete leads");
     };
-    switch (leads.get(leadId)) {
+    switch (leadsMap.get(leadId)) {
       case null { #err("Lead not found") };
-      case (?existing) {
+      case (?_existing) {
         // Hard-delete the lead
-        leads.remove(leadId);
+        leadsMap.remove(leadId);
         // Hard-delete all quotations associated with this lead
         let leadIdText = leadId.toText();
         let toDelete = quotations.values().toArray().filter(

@@ -20,6 +20,7 @@ export const PipelineStage = IDL.Variant({
   'inquiry' : IDL.Null,
   'bookingConfirmed' : IDL.Null,
   'surveyScheduled' : IDL.Null,
+  'quotationSent' : IDL.Null,
   'installation' : IDL.Null,
   'closedLost' : IDL.Null,
 });
@@ -334,6 +335,7 @@ export const idlFactory = ({ IDL }) => {
     'inquiry' : IDL.Null,
     'bookingConfirmed' : IDL.Null,
     'surveyScheduled' : IDL.Null,
+    'quotationSent' : IDL.Null,
     'installation' : IDL.Null,
     'closedLost' : IDL.Null,
   });

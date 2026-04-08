@@ -31,6 +31,7 @@ export type PipelineStage = { 'closedWon' : null } |
   { 'inquiry' : null } |
   { 'bookingConfirmed' : null } |
   { 'surveyScheduled' : null } |
+  { 'quotationSent' : null } |
   { 'installation' : null } |
   { 'closedLost' : null };
 export interface Quotation {

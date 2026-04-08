@@ -90,6 +90,7 @@ type PipelineStage =
    closedWon;
    inquiry;
    installation;
+   quotationSent;
    surveyScheduled;
  };
 type Lead = 

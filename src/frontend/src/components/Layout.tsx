@@ -200,63 +200,78 @@ export function Layout({
           )}
           style={{ background: "#0D192B", borderColor: "#26364A" }}
         >
-          <ScrollArea className="flex-1 py-3">
-            {/* Mobile nav */}
-            <nav className="md:hidden flex flex-col gap-0.5 px-2 mb-4">
-              {NAV_ITEMS.filter((item) => !item.adminOnly || adminUser).map(
-                (item) => (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    onClick={() => setSidebarOpen(false)}
-                    className="px-3 py-2 rounded text-sm font-medium flex items-center gap-2 transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    activeProps={{
-                      className: "bg-gold/10 text-gold border border-gold/20",
-                    }}
-                  >
-                    <item.icon className="w-4 h-4" />
-                    {item.label}
-                  </Link>
-                ),
-              )}
-            </nav>
+          {/* Mobile nav */}
+          <nav
+            className="md:hidden flex flex-col gap-0.5 px-2 pt-3 pb-2 border-b shrink-0"
+            style={{ borderColor: "#26364A" }}
+          >
+            {NAV_ITEMS.filter((item) => !item.adminOnly || adminUser).map(
+              (item) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setSidebarOpen(false)}
+                  className="px-3 py-2 rounded text-sm font-medium flex items-center gap-2 transition-colors text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  activeProps={{
+                    className: "bg-gold/10 text-gold border border-gold/20",
+                  }}
+                >
+                  <item.icon className="w-4 h-4" />
+                  {item.label}
+                </Link>
+              ),
+            )}
+          </nav>
 
-            {/* District filter */}
-            <div className="px-3">
-              <p className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase mb-2 px-1">
-                DISTRICT
+          {/* District filter — fixed heading + scrollable list */}
+          <div className="flex flex-col flex-1 min-h-0 py-3">
+            <div className="px-3 mb-2 shrink-0">
+              <p className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase px-1">
+                DISTRICT FILTER
               </p>
+            </div>
+            {/* "All Districts" always visible above scroll */}
+            <div className="px-3 mb-1 shrink-0">
               <button
                 type="button"
                 onClick={() => onDistrictChange?.(null)}
                 className={cn(
-                  "w-full text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 transition-colors mb-0.5",
+                  "w-full text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 transition-colors",
                   !selectedDistrict
                     ? "bg-gold/10 text-gold font-semibold border border-gold/20"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted/30",
                 )}
                 data-ocid="sidebar.all_districts.button"
               >
-                <MapPin className="w-3 h-3" /> All Districts
+                <MapPin className="w-3 h-3 shrink-0" /> All Districts
               </button>
-              {allDistricts.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => onDistrictChange?.(d)}
-                  className={cn(
-                    "w-full text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 transition-colors mb-0.5",
-                    selectedDistrict === d
-                      ? "bg-gold/10 text-gold font-semibold border border-gold/20"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/30",
-                  )}
-                  data-ocid="sidebar.district.button"
-                >
-                  <MapPin className="w-3 h-3" /> {d}
-                </button>
-              ))}
             </div>
-          </ScrollArea>
+            {/* Scrollable district list */}
+            <ScrollArea className="flex-1 px-3">
+              <div className="flex flex-col gap-0.5 pr-1">
+                {allDistricts.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => {
+                      onDistrictChange?.(d);
+                      setSidebarOpen(false);
+                    }}
+                    className={cn(
+                      "w-full text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 transition-colors",
+                      selectedDistrict === d
+                        ? "bg-gold/10 text-gold font-semibold border border-gold/20"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/30",
+                    )}
+                    data-ocid="sidebar.district.button"
+                  >
+                    <MapPin className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{d}</span>
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
         </aside>
 
         {/* Main content */}

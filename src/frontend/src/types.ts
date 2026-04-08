@@ -4,6 +4,7 @@ export { PipelineStage, UserRole };
 export const PIPELINE_STAGES = [
   PipelineStage.inquiry,
   PipelineStage.surveyScheduled,
+  PipelineStage.quotationSent,
   PipelineStage.bookingConfirmed,
   PipelineStage.installation,
   PipelineStage.closedWon,
@@ -13,6 +14,7 @@ export const PIPELINE_STAGES = [
 export const STAGE_LABELS: Record<PipelineStage, string> = {
   [PipelineStage.inquiry]: "INQUIRY",
   [PipelineStage.surveyScheduled]: "SURVEY SCHEDULED",
+  [PipelineStage.quotationSent]: "QUOTATION SENT",
   [PipelineStage.bookingConfirmed]: "BOOKING CONFIRMED",
   [PipelineStage.installation]: "INSTALLATION",
   [PipelineStage.closedWon]: "CLOSED WON",
@@ -32,6 +34,11 @@ export const STAGE_COLORS: Record<
     bg: "bg-amber-900/40",
     text: "text-amber-300",
     border: "border-amber-700/50",
+  },
+  [PipelineStage.quotationSent]: {
+    bg: "bg-cyan-900/40",
+    text: "text-cyan-300",
+    border: "border-cyan-700/50",
   },
   [PipelineStage.bookingConfirmed]: {
     bg: "bg-emerald-900/40",

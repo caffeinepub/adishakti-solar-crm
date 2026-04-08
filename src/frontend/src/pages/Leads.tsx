@@ -166,6 +166,27 @@ export default function Leads() {
             ))}
           </SelectContent>
         </Select>
+        <Select
+          value={selectedDistrict ?? "all"}
+          onValueChange={(v) => setSelectedDistrict(v === "all" ? null : v)}
+        >
+          <SelectTrigger
+            className="w-44 bg-muted border-border text-foreground h-9"
+            data-ocid="leads.district.select"
+          >
+            <SelectValue placeholder="All Districts" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover border-border max-h-60 overflow-y-auto">
+            <SelectItem value="all" className="text-foreground">
+              All Districts
+            </SelectItem>
+            {districts.map((d) => (
+              <SelectItem key={d} value={d} className="text-foreground">
+                {d}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Table */}

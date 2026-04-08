@@ -30,6 +30,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
+  CheckCircle2,
+  Copy,
   Edit2,
   Key,
   Loader2,
@@ -131,6 +133,106 @@ function getDiscomForDistrict(district: string): string {
   return "—";
 }
 
+// ── Created User Credentials Dialog ───────────────────────────────────────
+
+interface CreatedUserDialogProps {
+  userId: string;
+  password: string;
+  name: string;
+  role: UserRole;
+  onClose: () => void;
+}
+
+function CreatedUserDialog({
+  userId,
+  password,
+  name,
+  role,
+  onClose,
+}: CreatedUserDialogProps) {
+  const copy = (text: string, label: string) => {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => toast.success(`${label} copied!`));
+  };
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent
+        className="max-w-sm bg-card border-border text-foreground"
+        data-ocid="created_user.dialog"
+      >
+        <DialogHeader>
+          <DialogTitle className="text-gold font-bold flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+            User Created Successfully
+          </DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-3">
+          <p className="text-xs text-muted-foreground">
+            Share these login credentials with{" "}
+            <span className="font-semibold text-foreground">{name}</span> (
+            {ROLE_LABELS[role]}).
+          </p>
+
+          <div className="bg-muted rounded-lg p-4 flex flex-col gap-3">
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+                User ID
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-sm font-mono font-bold text-foreground bg-background/50 px-3 py-2 rounded border border-border">
+                  {userId}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => copy(userId, "User ID")}
+                  className="p-2 rounded hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Copy user ID"
+                  data-ocid="created_user.copy_userid"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1">
+                Password
+              </p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-sm font-mono font-bold text-gold bg-background/50 px-3 py-2 rounded border border-border">
+                  {password}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => copy(password, "Password")}
+                  className="p-2 rounded hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Copy password"
+                  data-ocid="created_user.copy_password"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-[10px] text-muted-foreground text-center">
+            ⚠️ Save these credentials. The password will not be shown again.
+          </p>
+
+          <Button
+            onClick={onClose}
+            className="w-full bg-gold text-[#0A1220] hover:bg-gold/90 font-semibold"
+            data-ocid="created_user.close_button"
+          >
+            Done
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Edit User Modal ────────────────────────────────────────────────────────
 
 interface EditUserModalProps {
@@ -149,20 +251,11 @@ function EditUserModal({
   onSave,
 }: EditUserModalProps) {
   const allDistricts = districts.length > 0 ? districts : DEFAULT_DISTRICTS;
-  // Parse additional districts from notes field (stored as JSON prefix)
-  const parseExtra = (): string[] => {
-    try {
-      const match = user.phone ? [] : [];
-      return match;
-    } catch {
-      return [];
-    }
-  };
 
   const [form, setForm] = useState({
     name: user.name,
     district: user.district,
-    additionalDistricts: parseExtra(),
+    additionalDistricts: [] as string[],
     phone: user.phone,
     email: user.email,
     whatsAppNumber: user.whatsAppNumber,
@@ -498,6 +591,303 @@ function DiscomZoneReference() {
   );
 }
 
+// ── New User Form ──────────────────────────────────────────────────────────
+
+interface NewUserFormState {
+  userId: string;
+  password: string;
+  name: string;
+  role: UserRole;
+  district: string;
+  additionalDistricts: string[];
+  phone: string;
+  email: string;
+  whatsAppNumber: string;
+}
+
+const EMPTY_FORM: NewUserFormState = {
+  userId: "",
+  password: "",
+  name: "",
+  role: UserRole.sales,
+  district: "",
+  additionalDistricts: [],
+  phone: "",
+  email: "",
+  whatsAppNumber: "",
+};
+
+interface CreateUserFormProps {
+  allDistricts: string[];
+  onCreated: (
+    userId: string,
+    password: string,
+    name: string,
+    role: UserRole,
+  ) => void;
+}
+
+function CreateUserForm({ allDistricts, onCreated }: CreateUserFormProps) {
+  const [form, setForm] = useState<NewUserFormState>(EMPTY_FORM);
+  const createUser = useCreateUser();
+
+  const isSales = form.role === UserRole.sales;
+  const otherDistricts = allDistricts.filter((d) => d !== form.district);
+
+  const setField = <K extends keyof NewUserFormState>(
+    f: K,
+    v: NewUserFormState[K],
+  ) => setForm((p) => ({ ...p, [f]: v }));
+
+  const toggleAdditional = (d: string) => {
+    setForm((p) => ({
+      ...p,
+      additionalDistricts: p.additionalDistricts.includes(d)
+        ? p.additionalDistricts.filter((x) => x !== d)
+        : [...p.additionalDistricts, d],
+    }));
+  };
+
+  const applyDiscomZone = (zone: (typeof DISCOM_ZONES)[number]) => {
+    const primary =
+      form.district && zone.districts.includes(form.district)
+        ? form.district
+        : zone.districts[0];
+    const additional = zone.districts.filter((d) => d !== primary);
+    setForm((p) => ({
+      ...p,
+      district: primary,
+      additionalDistricts: additional,
+    }));
+    toast.success(
+      `${zone.code} districts applied — ${zone.districts.length} districts assigned`,
+    );
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.userId || !form.password || !form.name || !form.district) {
+      toast.error("Username, Password, Name, and District are required.");
+      return;
+    }
+    try {
+      await createUser.mutateAsync({
+        userId: form.userId,
+        password: form.password,
+        name: form.name,
+        role: form.role,
+        district: form.district,
+        phone: form.phone,
+        email: form.email,
+        whatsAppNumber: form.whatsAppNumber,
+      });
+      onCreated(form.userId, form.password, form.name, form.role);
+      setForm(EMPTY_FORM);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to create user.";
+      toast.error(msg);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+      <div>
+        <Label className="text-xs text-muted-foreground uppercase mb-1 block">
+          Username *
+        </Label>
+        <Input
+          value={form.userId}
+          onChange={(e) => setField("userId", e.target.value)}
+          placeholder="e.g. rajan123"
+          className="bg-muted border-border text-foreground text-sm"
+          data-ocid="create_user.username.input"
+        />
+      </div>
+      <div>
+        <Label className="text-xs text-muted-foreground uppercase mb-1 block">
+          Password *
+        </Label>
+        <Input
+          value={form.password}
+          onChange={(e) => setField("password", e.target.value)}
+          placeholder="Set a password"
+          className="bg-muted border-border text-foreground text-sm font-mono"
+          data-ocid="create_user.password.input"
+        />
+        <p className="text-[10px] text-muted-foreground mt-1">
+          You will see the full credentials after creation
+        </p>
+      </div>
+      <div>
+        <Label className="text-xs text-muted-foreground uppercase mb-1 block">
+          Full Name *
+        </Label>
+        <Input
+          value={form.name}
+          onChange={(e) => setField("name", e.target.value)}
+          placeholder="Full name"
+          className="bg-muted border-border text-foreground text-sm"
+        />
+      </div>
+      <div>
+        <Label className="text-xs text-muted-foreground uppercase mb-1 block">
+          Role *
+        </Label>
+        <Select
+          value={form.role}
+          onValueChange={(v) => setField("role", v as UserRole)}
+        >
+          <SelectTrigger
+            className="bg-muted border-border text-foreground text-sm"
+            data-ocid="create_user.role.select"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-popover border-border">
+            {Object.values(UserRole).map((r) => (
+              <SelectItem key={r} value={r} className="text-foreground">
+                {ROLE_LABELS[r]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
+        <Label className="text-xs text-muted-foreground uppercase mb-1 block">
+          Primary District *
+        </Label>
+        <Select
+          value={form.district}
+          onValueChange={(v) => setField("district", v)}
+        >
+          <SelectTrigger
+            className="bg-muted border-border text-foreground text-sm"
+            data-ocid="create_user.district.select"
+          >
+            <SelectValue placeholder="Select district" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover border-border">
+            {allDistricts.map((d) => (
+              <SelectItem key={d} value={d} className="text-foreground">
+                {d}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Additional Districts — Sales only */}
+      {isSales && form.district && (
+        <div>
+          <Label className="text-xs text-muted-foreground uppercase mb-1.5 block">
+            Additional Districts
+            {form.additionalDistricts.length > 0 && (
+              <span className="ml-2 text-gold">
+                ({form.additionalDistricts.length} selected)
+              </span>
+            )}
+          </Label>
+          <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1 mb-2">
+            {otherDistricts.map((d) => {
+              const active = form.additionalDistricts.includes(d);
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => toggleAdditional(d)}
+                  className={cn(
+                    "text-left text-xs px-2.5 py-1.5 rounded border transition-colors",
+                    active
+                      ? "bg-gold/20 border-gold/40 text-gold font-semibold"
+                      : "bg-muted border-border text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <Label className="text-xs text-muted-foreground uppercase mb-1 block">
+          Phone
+        </Label>
+        <Input
+          value={form.phone}
+          onChange={(e) => setField("phone", e.target.value)}
+          placeholder="+91 XXXXXXXXXX"
+          className="bg-muted border-border text-foreground text-sm"
+        />
+      </div>
+      <div>
+        <Label className="text-xs text-muted-foreground uppercase mb-1 block">
+          WhatsApp Number
+        </Label>
+        <Input
+          value={form.whatsAppNumber}
+          onChange={(e) => setField("whatsAppNumber", e.target.value)}
+          placeholder="91XXXXXXXXXX"
+          className="bg-muted border-border text-foreground text-sm"
+        />
+      </div>
+
+      {/* DISCOM Zone Quick-Assign — Sales only */}
+      {isSales && (
+        <div>
+          <Label className="text-xs text-muted-foreground uppercase mb-2 block">
+            Assign by DISCOM Zone
+          </Label>
+          <div className="grid grid-cols-2 gap-2">
+            {DISCOM_ZONES.map((zone) => (
+              <button
+                key={zone.code}
+                type="button"
+                onClick={() => applyDiscomZone(zone)}
+                className={cn(
+                  "rounded-lg border px-3 py-2.5 text-left transition-all hover:opacity-90 active:scale-95",
+                  zone.color,
+                )}
+                data-ocid={`create_user.discom.${zone.code.toLowerCase()}.button`}
+              >
+                <p
+                  className={cn(
+                    "text-xs font-bold tracking-wider",
+                    zone.textColor,
+                  )}
+                >
+                  {zone.code}
+                </p>
+                <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">
+                  {zone.districts.length} districts
+                </p>
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1.5">
+            Click a zone button to auto-assign all its districts
+          </p>
+        </div>
+      )}
+
+      <Button
+        type="submit"
+        disabled={createUser.isPending}
+        className="w-full bg-gold text-[#0A1220] hover:bg-gold/90 font-bold mt-1"
+        data-ocid="create_user.submit_button"
+      >
+        {createUser.isPending ? (
+          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+        ) : (
+          <Plus className="w-4 h-4 mr-2" />
+        )}
+        Create User
+      </Button>
+    </form>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function UsersPage() {
@@ -505,6 +895,12 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [changePwdUser, setChangePwdUser] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null);
+  const [createdCreds, setCreatedCreds] = useState<{
+    userId: string;
+    password: string;
+    name: string;
+    role: UserRole;
+  } | null>(null);
 
   const { userRole } = useAuth();
   const { data: users = [], isLoading: usersLoading } = useAllUsers();
@@ -513,52 +909,8 @@ export default function UsersPage() {
 
   const isAdmin = userRole === UserRole.admin;
 
-  const createUser = useCreateUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteUser();
-
-  const [newUserForm, setNewUserForm] = useState({
-    userId: "",
-    password: "",
-    name: "",
-    role: UserRole.sales as UserRole,
-    district: "",
-    phone: "",
-    email: "",
-    whatsAppNumber: "",
-  });
-  const setField = (f: string, v: string | UserRole) =>
-    setNewUserForm((p) => ({ ...p, [f]: v }));
-
-  const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (
-      !newUserForm.userId ||
-      !newUserForm.password ||
-      !newUserForm.name ||
-      !newUserForm.district
-    ) {
-      toast.error("Username, Password, Name, and District are required.");
-      return;
-    }
-    try {
-      await createUser.mutateAsync(newUserForm);
-      toast.success(`User "${newUserForm.userId}" created!`);
-      setNewUserForm({
-        userId: "",
-        password: "",
-        name: "",
-        role: UserRole.sales,
-        district: "",
-        phone: "",
-        email: "",
-        whatsAppNumber: "",
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to create user.";
-      toast.error(msg);
-    }
-  };
 
   const handleUpdateUser = async (
     data: Partial<UserProfile> & { additionalDistricts?: string[] },
@@ -612,125 +964,12 @@ export default function UsersPage() {
                 Create New User
               </p>
             </div>
-            <form onSubmit={handleCreateUser} className="flex flex-col gap-3">
-              <div>
-                <Label className="text-xs text-muted-foreground uppercase mb-1 block">
-                  Username *
-                </Label>
-                <Input
-                  value={newUserForm.userId}
-                  onChange={(e) => setField("userId", e.target.value)}
-                  placeholder="e.g. rajan123"
-                  className="bg-muted border-border text-foreground text-sm"
-                  data-ocid="create_user.username.input"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground uppercase mb-1 block">
-                  Password *
-                </Label>
-                <Input
-                  type="password"
-                  value={newUserForm.password}
-                  onChange={(e) => setField("password", e.target.value)}
-                  placeholder="••••••••"
-                  className="bg-muted border-border text-foreground text-sm"
-                  data-ocid="create_user.password.input"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground uppercase mb-1 block">
-                  Full Name *
-                </Label>
-                <Input
-                  value={newUserForm.name}
-                  onChange={(e) => setField("name", e.target.value)}
-                  placeholder="Full name"
-                  className="bg-muted border-border text-foreground text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground uppercase mb-1 block">
-                  Role *
-                </Label>
-                <Select
-                  value={newUserForm.role}
-                  onValueChange={(v) => setField("role", v as UserRole)}
-                >
-                  <SelectTrigger
-                    className="bg-muted border-border text-foreground text-sm"
-                    data-ocid="create_user.role.select"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border">
-                    {Object.values(UserRole).map((r) => (
-                      <SelectItem key={r} value={r} className="text-foreground">
-                        {ROLE_LABELS[r]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground uppercase mb-1 block">
-                  District *
-                </Label>
-                <Select
-                  value={newUserForm.district}
-                  onValueChange={(v) => setField("district", v)}
-                >
-                  <SelectTrigger
-                    className="bg-muted border-border text-foreground text-sm"
-                    data-ocid="create_user.district.select"
-                  >
-                    <SelectValue placeholder="Select district" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover border-border">
-                    {allDistricts.map((d) => (
-                      <SelectItem key={d} value={d} className="text-foreground">
-                        {d}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground uppercase mb-1 block">
-                  Phone
-                </Label>
-                <Input
-                  value={newUserForm.phone}
-                  onChange={(e) => setField("phone", e.target.value)}
-                  placeholder="+91 XXXXXXXXXX"
-                  className="bg-muted border-border text-foreground text-sm"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground uppercase mb-1 block">
-                  WhatsApp Number
-                </Label>
-                <Input
-                  value={newUserForm.whatsAppNumber}
-                  onChange={(e) => setField("whatsAppNumber", e.target.value)}
-                  placeholder="91XXXXXXXXXX"
-                  className="bg-muted border-border text-foreground text-sm"
-                />
-              </div>
-              <Button
-                type="submit"
-                disabled={createUser.isPending}
-                className="w-full bg-gold text-[#0A1220] hover:bg-gold/90 font-bold mt-1"
-                data-ocid="create_user.submit_button"
-              >
-                {createUser.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Plus className="w-4 h-4 mr-2" />
-                )}
-                Create User
-              </Button>
-            </form>
+            <CreateUserForm
+              allDistricts={allDistricts}
+              onCreated={(userId, password, name, role) =>
+                setCreatedCreds({ userId, password, name, role })
+              }
+            />
           </div>
         </div>
 
@@ -860,6 +1099,17 @@ export default function UsersPage() {
 
       {/* DISCOM Zone Reference */}
       <DiscomZoneReference />
+
+      {/* Created User Credentials */}
+      {createdCreds && (
+        <CreatedUserDialog
+          userId={createdCreds.userId}
+          password={createdCreds.password}
+          name={createdCreds.name}
+          role={createdCreds.role}
+          onClose={() => setCreatedCreds(null)}
+        />
+      )}
 
       {editingUser && (
         <EditUserModal

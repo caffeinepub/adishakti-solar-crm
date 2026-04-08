@@ -88,6 +88,7 @@ export enum PipelineStage {
     inquiry = "inquiry",
     bookingConfirmed = "bookingConfirmed",
     surveyScheduled = "surveyScheduled",
+    quotationSent = "quotationSent",
     installation = "installation",
     closedLost = "closedLost"
 }

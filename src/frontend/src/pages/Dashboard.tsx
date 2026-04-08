@@ -1,8 +1,25 @@
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { useNavigate } from "@tanstack/react-router";
-import { Activity, Edit2, Eye, TrendingUp, Users, Zap } from "lucide-react";
+import {
+  Activity,
+  BookCheck,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  ClipboardPen,
+  Edit2,
+  Eye,
+  FileText,
+  Loader2,
+  TrendingUp,
+  Users,
+  Zap,
+} from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import type { Lead } from "../backend";
 import { PipelineStage, UserRole } from "../backend";
 import { KPICard } from "../components/KPICard";
@@ -14,22 +31,469 @@ import { StageModal } from "../components/StageModal";
 import { useAuth } from "../hooks/useAuth";
 import {
   useAddLead,
+  useAddRemark,
   useAllDistricts,
   useAllLeads,
   useAllUsers,
   useLeadsAddedToday,
+  useMyLeads,
   useTotalLeadsCount,
   useUpdateLead,
   useUpdateLeadStage,
 } from "../hooks/useQueries";
 import {
   PIPELINE_STAGES,
+  STAGE_COLORS,
   STAGE_LABELS,
   formatCurrency,
   formatDate,
 } from "../types";
 
+// ── Sales Lead Card with quick actions ───────────────────────────────────────
+
+interface SalesLeadCardProps {
+  lead: Lead;
+  onView: (lead: Lead) => void;
+}
+
+function SalesLeadCard({ lead, onView }: SalesLeadCardProps) {
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [quotRefOpen, setQuotRefOpen] = useState(false);
+  const [quotRef, setQuotRef] = useState("");
+
+  const updateStage = useUpdateLeadStage();
+  const addRemark = useAddRemark();
+
+  const isSurveyDone = lead.stage === PipelineStage.surveyScheduled;
+  const canMarkSurvey =
+    lead.stage === PipelineStage.inquiry ||
+    lead.stage === PipelineStage.surveyScheduled;
+
+  const handleSurveyDone = async () => {
+    if (isSurveyDone) return;
+    try {
+      await updateStage.mutateAsync({
+        id: lead.id,
+        stage: PipelineStage.surveyScheduled,
+        notes: "Survey completed",
+      });
+      await addRemark.mutateAsync({
+        leadId: lead.id,
+        content: "Survey completed",
+      });
+      toast.success("Survey marked as done!");
+    } catch {
+      toast.error("Failed to update stage.");
+    }
+  };
+
+  const handleBookingConfirm = async () => {
+    if (!window.confirm("Confirm this booking?")) return;
+    try {
+      await updateStage.mutateAsync({
+        id: lead.id,
+        stage: PipelineStage.bookingConfirmed,
+        notes: "Booking confirmed by sales",
+      });
+      await addRemark.mutateAsync({
+        leadId: lead.id,
+        content: "Booking confirmed by sales",
+      });
+      toast.success("Booking confirmed!");
+    } catch {
+      toast.error("Failed to confirm booking.");
+    }
+  };
+
+  const handleSaveNote = async () => {
+    if (!noteText.trim()) return;
+    try {
+      await addRemark.mutateAsync({
+        leadId: lead.id,
+        content: noteText.trim(),
+      });
+      setNoteText("");
+      setNoteOpen(false);
+      toast.success("Note saved!");
+    } catch {
+      toast.error("Failed to save note.");
+    }
+  };
+
+  const handleRequestQuotation = async () => {
+    if (!quotRef.trim()) return;
+    const msg = `Quotation requested - Ref: ${quotRef.trim()}`;
+    try {
+      await updateStage.mutateAsync({
+        id: lead.id,
+        stage: PipelineStage.quotationSent,
+        notes: msg,
+      });
+      await addRemark.mutateAsync({ leadId: lead.id, content: msg });
+      setQuotRef("");
+      setQuotRefOpen(false);
+      toast.success("Quotation request submitted!");
+    } catch {
+      toast.error("Failed to request quotation.");
+    }
+  };
+
+  const isBusy = updateStage.isPending || addRemark.isPending;
+
+  return (
+    <div
+      className="bg-card border border-border rounded-lg p-3 flex flex-col gap-2"
+      data-ocid="sales.lead_card"
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-foreground truncate">
+            {lead.customerName}
+          </p>
+          <p className="text-xs text-muted-foreground">{lead.phone}</p>
+          <p className="text-[10px] text-muted-foreground">{lead.district}</p>
+        </div>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <StageBadge stage={lead.stage} />
+          <button
+            type="button"
+            onClick={() => onView(lead)}
+            className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="View lead"
+            data-ocid="sales.view_lead.button"
+          >
+            <Eye className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Quick action buttons */}
+      <div className="flex flex-wrap gap-1.5 pt-1 border-t border-border/50">
+        {/* Survey Done */}
+        {canMarkSurvey && (
+          <button
+            type="button"
+            disabled={isSurveyDone || isBusy}
+            onClick={handleSurveyDone}
+            className={cn(
+              "flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded border transition-colors",
+              isSurveyDone
+                ? "bg-amber-900/20 text-amber-400 border-amber-700/40 cursor-default opacity-70"
+                : "bg-amber-900/30 text-amber-300 border-amber-700/50 hover:bg-amber-900/50",
+            )}
+            data-ocid="sales.survey_done.button"
+          >
+            {isBusy && !isSurveyDone ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <CheckCircle2 className="w-3 h-3" />
+            )}
+            {isSurveyDone ? "Survey Completed" : "Survey Done"}
+          </button>
+        )}
+
+        {/* Mark Booking Confirmed */}
+        {lead.stage !== PipelineStage.bookingConfirmed &&
+          lead.stage !== PipelineStage.closedWon &&
+          lead.stage !== PipelineStage.closedLost && (
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={handleBookingConfirm}
+              className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded border bg-emerald-900/30 text-emerald-300 border-emerald-700/50 hover:bg-emerald-900/50 transition-colors"
+              data-ocid="sales.booking_confirm.button"
+            >
+              {isBusy ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <BookCheck className="w-3 h-3" />
+              )}
+              Mark Booking
+            </button>
+          )}
+
+        {/* Request Quotation */}
+        {lead.stage !== PipelineStage.quotationSent &&
+          lead.stage !== PipelineStage.bookingConfirmed &&
+          lead.stage !== PipelineStage.closedWon &&
+          lead.stage !== PipelineStage.closedLost && (
+            <button
+              type="button"
+              onClick={() => {
+                setQuotRefOpen((v) => !v);
+                setNoteOpen(false);
+              }}
+              className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded border bg-cyan-900/30 text-cyan-300 border-cyan-700/50 hover:bg-cyan-900/50 transition-colors"
+              data-ocid="sales.request_quotation.button"
+            >
+              <FileText className="w-3 h-3" />
+              Request Quotation
+              {quotRefOpen ? (
+                <ChevronUp className="w-3 h-3" />
+              ) : (
+                <ChevronDown className="w-3 h-3" />
+              )}
+            </button>
+          )}
+
+        {/* Add Note */}
+        <button
+          type="button"
+          onClick={() => {
+            setNoteOpen((v) => !v);
+            setQuotRefOpen(false);
+          }}
+          className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded border bg-purple-900/30 text-purple-300 border-purple-700/50 hover:bg-purple-900/50 transition-colors"
+          data-ocid="sales.add_note.button"
+        >
+          <ClipboardPen className="w-3 h-3" />
+          Add Note
+          {noteOpen ? (
+            <ChevronUp className="w-3 h-3" />
+          ) : (
+            <ChevronDown className="w-3 h-3" />
+          )}
+        </button>
+      </div>
+
+      {/* Add Note inline */}
+      {noteOpen && (
+        <div className="flex flex-col gap-1.5 pt-1">
+          <Textarea
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            placeholder="Type your note..."
+            rows={2}
+            className="bg-muted border-border text-foreground text-xs resize-none"
+            data-ocid="sales.note_input"
+          />
+          <div className="flex gap-1.5">
+            <Button
+              size="sm"
+              className="h-7 text-xs bg-gold text-[#0A1220] hover:bg-gold/90 font-semibold"
+              onClick={handleSaveNote}
+              disabled={addRemark.isPending || !noteText.trim()}
+              data-ocid="sales.note_save.button"
+            >
+              {addRemark.isPending ? (
+                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+              ) : null}
+              Save Note
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs text-muted-foreground"
+              onClick={() => {
+                setNoteOpen(false);
+                setNoteText("");
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Request Quotation inline */}
+      {quotRefOpen && (
+        <div className="flex flex-col gap-1.5 pt-1">
+          <input
+            type="text"
+            value={quotRef}
+            onChange={(e) => setQuotRef(e.target.value)}
+            placeholder="Enter Quotation Ref ID"
+            className="bg-muted border border-border rounded px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-gold/50"
+            data-ocid="sales.quotation_ref_input"
+          />
+          <div className="flex gap-1.5">
+            <Button
+              size="sm"
+              className="h-7 text-xs bg-cyan-700 text-white hover:bg-cyan-600 font-semibold"
+              onClick={handleRequestQuotation}
+              disabled={updateStage.isPending || !quotRef.trim()}
+              data-ocid="sales.quotation_submit.button"
+            >
+              {updateStage.isPending ? (
+                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+              ) : null}
+              Submit
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs text-muted-foreground"
+              onClick={() => {
+                setQuotRefOpen(false);
+                setQuotRef("");
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Sales Dashboard View ─────────────────────────────────────────────────────
+
+function SalesDashboard() {
+  const [editLead, setEditLead] = useState<Lead | null>(null);
+  const navigate = useNavigate();
+  const { userId } = useAuth();
+  const { data: myLeads = [], isLoading } = useMyLeads();
+  const { data: districts = [] } = useAllDistricts();
+  const { data: users = [] } = useAllUsers();
+  const updateLead = useUpdateLead();
+  const salesUsers = users.filter((u) => u.role === UserRole.sales);
+
+  const leadsByStage: Record<PipelineStage, Lead[]> = {
+    [PipelineStage.inquiry]: [],
+    [PipelineStage.surveyScheduled]: [],
+    [PipelineStage.quotationSent]: [],
+    [PipelineStage.bookingConfirmed]: [],
+    [PipelineStage.installation]: [],
+    [PipelineStage.closedWon]: [],
+    [PipelineStage.closedLost]: [],
+  };
+  for (const l of myLeads) {
+    leadsByStage[l.stage]?.push(l);
+  }
+
+  const activeStages = PIPELINE_STAGES.filter(
+    (s) => leadsByStage[s].length > 0,
+  );
+
+  return (
+    <Layout
+      onScheduleSurvey={() => navigate({ to: "/pipeline" })}
+      showRightPanel={false}
+    >
+      <div className="mb-6">
+        <h1 className="text-2xl font-extrabold tracking-tight text-foreground uppercase">
+          My Assigned Leads
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Leads assigned to you — Shree Adishakti Solar Pvt Ltd
+        </p>
+      </div>
+
+      {/* Summary pills */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {PIPELINE_STAGES.map((stage) => {
+          const count = leadsByStage[stage].length;
+          if (count === 0) return null;
+          const colors = STAGE_COLORS[stage];
+          return (
+            <div
+              key={stage}
+              className={cn(
+                "px-3 py-1 rounded-full border text-[11px] font-bold flex items-center gap-1.5",
+                colors.bg,
+                colors.text,
+                colors.border,
+              )}
+            >
+              {STAGE_LABELS[stage]}
+              <span className="bg-black/20 px-1.5 py-0.5 rounded-full text-[10px]">
+                {count}
+              </span>
+            </div>
+          );
+        })}
+        {myLeads.length === 0 && !isLoading && (
+          <span className="text-xs text-muted-foreground">No stages yet</span>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex flex-col gap-3" data-ocid="sales.loading_state">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-28 w-full" />
+          ))}
+        </div>
+      ) : myLeads.length === 0 ? (
+        <div
+          className="bg-card border border-border rounded-lg p-12 text-center"
+          data-ocid="sales.empty_state"
+        >
+          <Zap className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
+          <p className="text-base font-semibold text-muted-foreground">
+            No leads assigned yet
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Your manager will assign leads to you soon.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {activeStages.map((stage) => (
+            <div key={stage}>
+              <div className="flex items-center gap-2 mb-2">
+                <span
+                  className={cn(
+                    "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border",
+                    STAGE_COLORS[stage].bg,
+                    STAGE_COLORS[stage].text,
+                    STAGE_COLORS[stage].border,
+                  )}
+                >
+                  {STAGE_LABELS[stage]}
+                </span>
+                <span className="text-[10px] text-muted-foreground font-semibold">
+                  {leadsByStage[stage].length} lead
+                  {leadsByStage[stage].length !== 1 ? "s" : ""}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {leadsByStage[stage].map((lead) => (
+                  <SalesLeadCard
+                    key={lead.id.toString()}
+                    lead={lead}
+                    onView={setEditLead}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <LeadModal
+        open={!!editLead}
+        onClose={() => setEditLead(null)}
+        editLead={editLead}
+        districts={districts}
+        salesUsers={salesUsers}
+        currentUserId={userId ?? ""}
+        onSubmit={async (params) => {
+          if (editLead) {
+            await updateLead.mutateAsync({ leadId: editLead.id, ...params });
+          }
+        }}
+      />
+    </Layout>
+  );
+}
+
+// ── Admin / Backoffice Dashboard ──────────────────────────────────────────────
+
 export default function Dashboard() {
+  const { userRole } = useAuth();
+
+  // Sales role gets a dedicated assigned-leads view
+  if (userRole === UserRole.sales) {
+    return <SalesDashboard />;
+  }
+
+  return <AdminDashboard />;
+}
+
+function AdminDashboard() {
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
   const [addLeadOpen, setAddLeadOpen] = useState(false);
   const [editLead, setEditLead] = useState<Lead | null>(null);
@@ -63,6 +527,7 @@ export default function Dashboard() {
   const leadsByStage: Record<PipelineStage, Lead[]> = {
     [PipelineStage.inquiry]: [],
     [PipelineStage.surveyScheduled]: [],
+    [PipelineStage.quotationSent]: [],
     [PipelineStage.bookingConfirmed]: [],
     [PipelineStage.installation]: [],
     [PipelineStage.closedWon]: [],
