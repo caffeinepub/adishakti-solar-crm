@@ -320,7 +320,7 @@ export function LeadModal({
                     >
                       <SelectValue placeholder="Select district" />
                     </SelectTrigger>
-                    <SelectContent className="bg-popover border-border">
+                    <SelectContent className="bg-popover border-border max-h-60 overflow-y-auto">
                       {allDistricts.map((d) => (
                         <SelectItem
                           key={d}

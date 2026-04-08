@@ -35,10 +35,12 @@ import {
   Edit2,
   Key,
   Loader2,
+  MapPin,
   Plus,
   Trash2,
   UserPlus,
   Users,
+  X,
   Zap,
 } from "lucide-react";
 import { useState } from "react";
@@ -265,15 +267,6 @@ function EditUserModal({
   const set = (f: string, v: string | boolean) =>
     setForm((p) => ({ ...p, [f]: v }));
 
-  const toggleAdditional = (d: string) => {
-    setForm((p) => ({
-      ...p,
-      additionalDistricts: p.additionalDistricts.includes(d)
-        ? p.additionalDistricts.filter((x) => x !== d)
-        : [...p.additionalDistricts, d],
-    }));
-  };
-
   const handleSave = async () => {
     setLoading(true);
     try {
@@ -337,37 +330,75 @@ function EditUserModal({
             </Select>
           </div>
 
-          {/* Multiple Districts */}
+          {/* Multiple Districts — dropdown multi-select */}
           {user.role === UserRole.sales && (
             <div>
               <Label className="text-xs text-muted-foreground uppercase mb-2 block">
-                Additional Districts (multi-select)
+                Additional Districts
+                {form.additionalDistricts.length > 0 && (
+                  <span className="ml-2 text-gold">
+                    ({form.additionalDistricts.length} selected)
+                  </span>
+                )}
               </Label>
-              <div className="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
-                {otherDistricts.map((d) => {
-                  const active = form.additionalDistricts.includes(d);
-                  return (
-                    <button
+              <Select
+                value=""
+                onValueChange={(v) => {
+                  if (v && !form.additionalDistricts.includes(v)) {
+                    setForm((p) => ({
+                      ...p,
+                      additionalDistricts: [...p.additionalDistricts, v],
+                    }));
+                  }
+                }}
+              >
+                <SelectTrigger
+                  className="bg-muted border-border text-foreground text-xs"
+                  data-ocid="edit_user.additional_district.select"
+                >
+                  <MapPin className="w-3 h-3 mr-1.5 text-muted-foreground flex-shrink-0" />
+                  <SelectValue placeholder="Add a district…" />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border max-h-60 overflow-y-auto">
+                  {otherDistricts
+                    .filter((d) => !form.additionalDistricts.includes(d))
+                    .map((d) => (
+                      <SelectItem
+                        key={d}
+                        value={d}
+                        className="text-foreground text-xs"
+                      >
+                        {d}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              {form.additionalDistricts.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {form.additionalDistricts.map((d) => (
+                    <span
                       key={d}
-                      type="button"
-                      onClick={() => toggleAdditional(d)}
-                      className={cn(
-                        "text-left text-xs px-2.5 py-1.5 rounded border transition-colors",
-                        active
-                          ? "bg-gold/20 border-gold/40 text-gold font-semibold"
-                          : "bg-muted border-border text-muted-foreground hover:text-foreground hover:border-border/80",
-                      )}
+                      className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-gold/15 border border-gold/30 text-gold font-semibold"
                     >
                       {d}
-                    </button>
-                  );
-                })}
-              </div>
-              {form.additionalDistricts.length > 0 && (
-                <p className="text-[10px] text-muted-foreground mt-1.5">
-                  {form.additionalDistricts.length} additional district
-                  {form.additionalDistricts.length !== 1 ? "s" : ""} selected
-                </p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setForm((p) => ({
+                            ...p,
+                            additionalDistricts: p.additionalDistricts.filter(
+                              (x) => x !== d,
+                            ),
+                          }))
+                        }
+                        className="hover:text-destructive transition-colors"
+                        aria-label={`Remove ${d}`}
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
           )}
@@ -639,15 +670,6 @@ function CreateUserForm({ allDistricts, onCreated }: CreateUserFormProps) {
     v: NewUserFormState[K],
   ) => setForm((p) => ({ ...p, [f]: v }));
 
-  const toggleAdditional = (d: string) => {
-    setForm((p) => ({
-      ...p,
-      additionalDistricts: p.additionalDistricts.includes(d)
-        ? p.additionalDistricts.filter((x) => x !== d)
-        : [...p.additionalDistricts, d],
-    }));
-  };
-
   const applyDiscomZone = (zone: (typeof DISCOM_ZONES)[number]) => {
     const primary =
       form.district && zone.districts.includes(form.district)
@@ -776,7 +798,7 @@ function CreateUserForm({ allDistricts, onCreated }: CreateUserFormProps) {
         </Select>
       </div>
 
-      {/* Additional Districts — Sales only */}
+      {/* Additional Districts — Sales only, dropdown multi-select */}
       {isSales && form.district && (
         <div>
           <Label className="text-xs text-muted-foreground uppercase mb-1.5 block">
@@ -787,26 +809,65 @@ function CreateUserForm({ allDistricts, onCreated }: CreateUserFormProps) {
               </span>
             )}
           </Label>
-          <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1 mb-2">
-            {otherDistricts.map((d) => {
-              const active = form.additionalDistricts.includes(d);
-              return (
-                <button
+          <Select
+            value=""
+            onValueChange={(v) => {
+              if (v && !form.additionalDistricts.includes(v)) {
+                setForm((p) => ({
+                  ...p,
+                  additionalDistricts: [...p.additionalDistricts, v],
+                }));
+              }
+            }}
+          >
+            <SelectTrigger
+              className="bg-muted border-border text-foreground text-sm"
+              data-ocid="create_user.additional_district.select"
+            >
+              <MapPin className="w-3 h-3 mr-1.5 text-muted-foreground flex-shrink-0" />
+              <SelectValue placeholder="Add a district…" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border-border max-h-60 overflow-y-auto">
+              {otherDistricts
+                .filter((d) => !form.additionalDistricts.includes(d))
+                .map((d) => (
+                  <SelectItem
+                    key={d}
+                    value={d}
+                    className="text-foreground text-sm"
+                  >
+                    {d}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          {form.additionalDistricts.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {form.additionalDistricts.map((d) => (
+                <span
                   key={d}
-                  type="button"
-                  onClick={() => toggleAdditional(d)}
-                  className={cn(
-                    "text-left text-xs px-2.5 py-1.5 rounded border transition-colors",
-                    active
-                      ? "bg-gold/20 border-gold/40 text-gold font-semibold"
-                      : "bg-muted border-border text-muted-foreground hover:text-foreground",
-                  )}
+                  className="inline-flex items-center gap-1 text-[10px] px-2 py-1 rounded bg-gold/15 border border-gold/30 text-gold font-semibold"
                 >
                   {d}
-                </button>
-              );
-            })}
-          </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm((p) => ({
+                        ...p,
+                        additionalDistricts: p.additionalDistricts.filter(
+                          (x) => x !== d,
+                        ),
+                      }))
+                    }
+                    className="hover:text-destructive transition-colors"
+                    aria-label={`Remove ${d}`}
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -836,37 +897,39 @@ function CreateUserForm({ allDistricts, onCreated }: CreateUserFormProps) {
       {/* DISCOM Zone Quick-Assign — Sales only */}
       {isSales && (
         <div>
-          <Label className="text-xs text-muted-foreground uppercase mb-2 block">
+          <Label className="text-xs text-muted-foreground uppercase mb-1.5 block">
             Assign by DISCOM Zone
           </Label>
-          <div className="grid grid-cols-2 gap-2">
-            {DISCOM_ZONES.map((zone) => (
-              <button
-                key={zone.code}
-                type="button"
-                onClick={() => applyDiscomZone(zone)}
-                className={cn(
-                  "rounded-lg border px-3 py-2.5 text-left transition-all hover:opacity-90 active:scale-95",
-                  zone.color,
-                )}
-                data-ocid={`create_user.discom.${zone.code.toLowerCase()}.button`}
-              >
-                <p
-                  className={cn(
-                    "text-xs font-bold tracking-wider",
-                    zone.textColor,
-                  )}
-                >
-                  {zone.code}
-                </p>
-                <p className="text-[9px] text-muted-foreground mt-0.5 leading-tight">
-                  {zone.districts.length} districts
-                </p>
-              </button>
-            ))}
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-1.5">
-            Click a zone button to auto-assign all its districts
+          <Select
+            value=""
+            onValueChange={(code) => {
+              const zone = DISCOM_ZONES.find((z) => z.code === code);
+              if (zone) applyDiscomZone(zone);
+            }}
+          >
+            <SelectTrigger
+              className="bg-muted border-border text-foreground text-sm"
+              data-ocid="create_user.discom_zone.select"
+            >
+              <SelectValue placeholder="Select a zone to auto-assign districts…" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover border-border">
+              <SelectItem value="TPCODL" className="text-foreground">
+                TPCODL
+              </SelectItem>
+              <SelectItem value="TPNODL" className="text-foreground">
+                TPNODL
+              </SelectItem>
+              <SelectItem value="TPSODL" className="text-foreground">
+                TPSODL
+              </SelectItem>
+              <SelectItem value="TPWODL" className="text-foreground">
+                TPWODL
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Selecting a zone auto-assigns all its districts
           </p>
         </div>
       )}

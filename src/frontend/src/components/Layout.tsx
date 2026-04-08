@@ -6,7 +6,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -223,54 +229,53 @@ export function Layout({
             )}
           </nav>
 
-          {/* District filter — fixed heading + scrollable list */}
-          <div className="flex flex-col flex-1 min-h-0 py-3">
-            <div className="px-3 mb-2 shrink-0">
-              <p className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase px-1">
-                DISTRICT FILTER
-              </p>
-            </div>
-            {/* "All Districts" always visible above scroll */}
-            <div className="px-3 mb-1 shrink-0">
+          {/* District filter — dropdown */}
+          <div className="flex flex-col flex-1 min-h-0 py-3 px-3">
+            <p className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase px-1 mb-2 shrink-0">
+              DISTRICT FILTER
+            </p>
+            <Select
+              value={selectedDistrict ?? "all"}
+              onValueChange={(v) => {
+                onDistrictChange?.(v === "all" ? null : v);
+                setSidebarOpen(false);
+              }}
+            >
+              <SelectTrigger
+                className="w-full bg-muted/40 border-border text-foreground text-xs h-9"
+                data-ocid="sidebar.district.select"
+              >
+                <MapPin className="w-3 h-3 mr-1.5 text-muted-foreground flex-shrink-0" />
+                <SelectValue placeholder="All Districts" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover border-border max-h-72 overflow-y-auto">
+                <SelectItem
+                  value="all"
+                  className="text-foreground text-xs font-semibold"
+                >
+                  All Districts
+                </SelectItem>
+                {allDistricts.map((d) => (
+                  <SelectItem
+                    key={d}
+                    value={d}
+                    className="text-foreground text-xs"
+                  >
+                    {d}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedDistrict && (
               <button
                 type="button"
                 onClick={() => onDistrictChange?.(null)}
-                className={cn(
-                  "w-full text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 transition-colors",
-                  !selectedDistrict
-                    ? "bg-gold/10 text-gold font-semibold border border-gold/20"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/30",
-                )}
-                data-ocid="sidebar.all_districts.button"
+                className="mt-2 text-[10px] text-gold hover:text-gold/80 transition-colors text-left px-1"
+                data-ocid="sidebar.clear_district.button"
               >
-                <MapPin className="w-3 h-3 shrink-0" /> All Districts
+                ✕ Clear filter
               </button>
-            </div>
-            {/* Scrollable district list */}
-            <ScrollArea className="flex-1 px-3">
-              <div className="flex flex-col gap-0.5 pr-1">
-                {allDistricts.map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => {
-                      onDistrictChange?.(d);
-                      setSidebarOpen(false);
-                    }}
-                    className={cn(
-                      "w-full text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 transition-colors",
-                      selectedDistrict === d
-                        ? "bg-gold/10 text-gold font-semibold border border-gold/20"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/30",
-                    )}
-                    data-ocid="sidebar.district.button"
-                  >
-                    <MapPin className="w-3 h-3 shrink-0" />
-                    <span className="truncate">{d}</span>
-                  </button>
-                ))}
-              </div>
-            </ScrollArea>
+            )}
           </div>
         </aside>
 
