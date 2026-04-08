@@ -315,12 +315,12 @@ function EditUserModal({
               onValueChange={(v) => set("district", v)}
             >
               <SelectTrigger
-                className="bg-muted border-border text-foreground"
+                className="w-full bg-muted border-border text-foreground h-10"
                 data-ocid="edit_user.district.select"
               >
-                <SelectValue />
+                <SelectValue placeholder="Select district" />
               </SelectTrigger>
-              <SelectContent className="bg-popover border-border">
+              <SelectContent className="bg-popover border-border max-h-60 overflow-y-auto">
                 {allDistricts.map((d) => (
                   <SelectItem key={d} value={d} className="text-foreground">
                     {d}
@@ -342,7 +342,6 @@ function EditUserModal({
                 )}
               </Label>
               <Select
-                value=""
                 onValueChange={(v) => {
                   if (v && !form.additionalDistricts.includes(v)) {
                     setForm((p) => ({
@@ -353,7 +352,7 @@ function EditUserModal({
                 }}
               >
                 <SelectTrigger
-                  className="bg-muted border-border text-foreground text-xs"
+                  className="w-full bg-muted border-border text-foreground h-10"
                   data-ocid="edit_user.additional_district.select"
                 >
                   <MapPin className="w-3 h-3 mr-1.5 text-muted-foreground flex-shrink-0" />
@@ -760,7 +759,7 @@ function CreateUserForm({ allDistricts, onCreated }: CreateUserFormProps) {
           onValueChange={(v) => setField("role", v as UserRole)}
         >
           <SelectTrigger
-            className="bg-muted border-border text-foreground text-sm"
+            className="w-full bg-muted border-border text-foreground h-10"
             data-ocid="create_user.role.select"
           >
             <SelectValue />
@@ -783,12 +782,12 @@ function CreateUserForm({ allDistricts, onCreated }: CreateUserFormProps) {
           onValueChange={(v) => setField("district", v)}
         >
           <SelectTrigger
-            className="bg-muted border-border text-foreground text-sm"
+            className="w-full bg-muted border-border text-foreground h-10"
             data-ocid="create_user.district.select"
           >
             <SelectValue placeholder="Select district" />
           </SelectTrigger>
-          <SelectContent className="bg-popover border-border">
+          <SelectContent className="bg-popover border-border max-h-60 overflow-y-auto">
             {allDistricts.map((d) => (
               <SelectItem key={d} value={d} className="text-foreground">
                 {d}
@@ -810,7 +809,6 @@ function CreateUserForm({ allDistricts, onCreated }: CreateUserFormProps) {
             )}
           </Label>
           <Select
-            value=""
             onValueChange={(v) => {
               if (v && !form.additionalDistricts.includes(v)) {
                 setForm((p) => ({
@@ -821,7 +819,7 @@ function CreateUserForm({ allDistricts, onCreated }: CreateUserFormProps) {
             }}
           >
             <SelectTrigger
-              className="bg-muted border-border text-foreground text-sm"
+              className="w-full bg-muted border-border text-foreground h-10"
               data-ocid="create_user.additional_district.select"
             >
               <MapPin className="w-3 h-3 mr-1.5 text-muted-foreground flex-shrink-0" />
@@ -901,30 +899,29 @@ function CreateUserForm({ allDistricts, onCreated }: CreateUserFormProps) {
             Assign by DISCOM Zone
           </Label>
           <Select
-            value=""
             onValueChange={(code) => {
               const zone = DISCOM_ZONES.find((z) => z.code === code);
               if (zone) applyDiscomZone(zone);
             }}
           >
             <SelectTrigger
-              className="bg-muted border-border text-foreground text-sm"
+              className="w-full bg-muted border-border text-foreground h-10"
               data-ocid="create_user.discom_zone.select"
             >
               <SelectValue placeholder="Select a zone to auto-assign districts…" />
             </SelectTrigger>
             <SelectContent className="bg-popover border-border">
               <SelectItem value="TPCODL" className="text-foreground">
-                TPCODL
+                TPCODL — Central Odisha
               </SelectItem>
               <SelectItem value="TPNODL" className="text-foreground">
-                TPNODL
+                TPNODL — Northern Odisha
               </SelectItem>
               <SelectItem value="TPSODL" className="text-foreground">
-                TPSODL
+                TPSODL — Southern Odisha
               </SelectItem>
               <SelectItem value="TPWODL" className="text-foreground">
-                TPWODL
+                TPWODL — Western Odisha
               </SelectItem>
             </SelectContent>
           </Select>

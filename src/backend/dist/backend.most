@@ -92,18 +92,6 @@ actor {
       var adminAssigned : Bool;
       userRoles : Map__605269027<Principal, UserRole__1054455867>
     };
-  stable adminProfile :
-    {
-      district : Text;
-      email : Text;
-      isActive : Bool;
-      name : Text;
-      passwordHash : Text;
-      phone : Text;
-      role : UserRole__599675725;
-      userId : Text;
-      whatsAppNumber : Text
-    };
   stable leads :
     {
       var root : Node__46230540<Nat, OldLead__803602815>;

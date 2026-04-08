@@ -56,9 +56,9 @@ export default function Login() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gold/20 border border-gold/30 mb-4">
             <img
-              src="/assets/generated/solar-logo-transparent.dim_60x60.png"
-              alt="logo"
-              className="w-10 h-10 rounded-full"
+              src="/assets/logo.jpeg"
+              alt="Shree Adishakti Solar logo"
+              className="w-12 h-12 rounded-full object-cover"
               onError={(e) => {
                 const t = e.currentTarget;
                 t.style.display = "none";

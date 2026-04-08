@@ -113,9 +113,9 @@ export function Layout({
             )}
           </button>
           <img
-            src="/assets/generated/solar-logo-transparent.dim_60x60.png"
-            alt="logo"
-            className="w-7 h-7 rounded-full"
+            src="/assets/logo.jpeg"
+            alt="Shree Adishakti Solar logo"
+            className="w-7 h-7 rounded-full object-cover"
           />
           <span className="font-bold text-xs md:text-sm tracking-tight text-foreground hidden sm:block">
             SHREE ADISHAKTI SOLAR

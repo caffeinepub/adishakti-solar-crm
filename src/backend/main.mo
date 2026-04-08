@@ -289,18 +289,23 @@ actor {
   //  INIT — seed admin
   // ─────────────────────────────────────────────
 
-  let adminProfile : UserProfile = {
-    userId       = "admin";
-    passwordHash = "Admin@1234";
-    name         = "Administrator";
-    role         = #admin;
-    district     = "";
-    phone        = "";
-    email        = "";
-    whatsAppNumber = "";
-    isActive     = true;
+  // Seed admin only if not already present — idempotent so upgrades never wipe existing account
+  switch (users.get("admin")) {
+    case null {
+      users.add("admin", {
+        userId       = "admin";
+        passwordHash = "Admin@1234";
+        name         = "Administrator";
+        role         = #admin;
+        district     = "";
+        phone        = "";
+        email        = "";
+        whatsAppNumber = "";
+        isActive     = true;
+      });
+    };
+    case (?_) {}; // admin already exists, leave it untouched
   };
-  users.add("admin", adminProfile);
 
   // ─────────────────────────────────────────────
   //  INTERNAL HELPERS
