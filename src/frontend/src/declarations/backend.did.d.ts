@@ -10,33 +10,34 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
-export type ApprovalStatus = { 'pending' : null } |
-  { 'approved' : null } |
-  { 'rejected' : null };
-export type District = string;
 export interface Lead {
-  'id' : LeadId,
+  'id' : bigint,
   'customerName' : string,
   'createdAt' : Time,
-  'createdBy' : UserId,
+  'createdBy' : string,
   'email' : string,
-  'district' : District,
+  'district' : string,
   'updatedAt' : Time,
   'stage' : PipelineStage,
-  'assignedOperationsPerson' : [] | [UserId],
+  'assignedOperationsPerson' : [] | [string],
   'address' : string,
   'notes' : string,
   'phone' : string,
   'requirements' : Requirement,
-  'assignedSalesPerson' : [] | [UserId],
+  'assignedSalesPerson' : [] | [string],
+  'remarks' : Array<Remark>,
 }
-export type LeadId = bigint;
 export type PipelineStage = { 'closedWon' : null } |
   { 'inquiry' : null } |
   { 'bookingConfirmed' : null } |
   { 'surveyScheduled' : null } |
   { 'installation' : null } |
   { 'closedLost' : null };
+export interface Remark {
+  'content' : string,
+  'addedAt' : Time,
+  'addedBy' : string,
+}
 export interface Requirement {
   'panelSize' : string,
   'notes' : string,
@@ -44,57 +45,157 @@ export interface Requirement {
   'systemType' : string,
 }
 export type Time = bigint;
-export interface UserApprovalInfo {
-  'status' : ApprovalStatus,
-  'principal' : Principal,
-}
-export type UserId = Principal;
 export interface UserProfile {
-  'principal' : UserId,
+  'whatsAppNumber' : string,
+  'userId' : string,
   'name' : string,
   'role' : UserRole,
+  'isActive' : boolean,
   'email' : string,
-  'district' : District,
+  'district' : string,
+  'passwordHash' : string,
   'phone' : string,
 }
 export type UserRole = { 'admin' : null } |
+  { 'backoffice' : null } |
   { 'sales' : null } |
-  { 'operations' : null };
+  { 'operation' : null };
 export type UserRole__1 = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
 export interface _SERVICE {
   '_initializeAccessControl' : ActorMethod<[], undefined>,
-  'addDistrict' : ActorMethod<[District], undefined>,
-  'addLead' : ActorMethod<[Lead], LeadId>,
-  'addUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'addDistrict' : ActorMethod<
+    [string, string],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
+  'addLead' : ActorMethod<
+    [string, string, string, string, string, string, Requirement, string],
+    { 'ok' : Lead } |
+      { 'err' : string }
+  >,
+  'addRemark' : ActorMethod<
+    [string, bigint, string],
+    { 'ok' : Lead } |
+      { 'err' : string }
+  >,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole__1], undefined>,
-  'assignLeadToOperations' : ActorMethod<[LeadId, UserId], undefined>,
-  'assignLeadToSales' : ActorMethod<[LeadId, UserId], undefined>,
-  'getAllDistricts' : ActorMethod<[], Array<District>>,
-  'getAllLeads' : ActorMethod<[], Array<Lead>>,
-  'getAllUserProfiles' : ActorMethod<[], Array<UserProfile>>,
-  'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
+  'assignLeadToOperations' : ActorMethod<
+    [string, bigint, string],
+    { 'ok' : Lead } |
+      { 'err' : string }
+  >,
+  'assignLeadToSales' : ActorMethod<
+    [string, bigint, string],
+    { 'ok' : Lead } |
+      { 'err' : string }
+  >,
+  'changePassword' : ActorMethod<
+    [string, string, string],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
+  'createUser' : ActorMethod<
+    [string, string, string, string, UserRole, string, string, string, string],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
+  'getAllDistricts' : ActorMethod<[], Array<string>>,
+  'getAllLeads' : ActorMethod<
+    [string],
+    { 'ok' : Array<Lead> } |
+      { 'err' : string }
+  >,
+  'getAllUsers' : ActorMethod<
+    [string],
+    { 'ok' : Array<UserProfile> } |
+      { 'err' : string }
+  >,
   'getCallerUserRole' : ActorMethod<[], UserRole__1>,
-  'getLeadById' : ActorMethod<[LeadId], [] | [Lead]>,
-  'getLeadsAddedToday' : ActorMethod<[], bigint>,
-  'getLeadsByDistrict' : ActorMethod<[District], Array<Lead>>,
-  'getLeadsByDistrictCount' : ActorMethod<[], Array<[District, bigint]>>,
-  'getLeadsBySalesPerson' : ActorMethod<[UserId], Array<Lead>>,
-  'getLeadsByStage' : ActorMethod<[PipelineStage], Array<Lead>>,
-  'getLeadsByStageCount' : ActorMethod<[], Array<[PipelineStage, bigint]>>,
-  'getMyLeads' : ActorMethod<[], Array<Lead>>,
-  'getTotalLeadsCount' : ActorMethod<[], bigint>,
-  'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'getLeadById' : ActorMethod<
+    [string, bigint],
+    { 'ok' : Lead } |
+      { 'err' : string }
+  >,
+  'getLeadsAddedToday' : ActorMethod<
+    [string],
+    { 'ok' : bigint } |
+      { 'err' : string }
+  >,
+  'getLeadsByDistrict' : ActorMethod<
+    [string, string],
+    { 'ok' : Array<Lead> } |
+      { 'err' : string }
+  >,
+  'getLeadsByDistrictCount' : ActorMethod<
+    [string],
+    { 'ok' : Array<[string, bigint]> } |
+      { 'err' : string }
+  >,
+  'getLeadsByStage' : ActorMethod<
+    [string, PipelineStage],
+    { 'ok' : Array<Lead> } |
+      { 'err' : string }
+  >,
+  'getLeadsByStageCount' : ActorMethod<
+    [string],
+    { 'ok' : Array<[PipelineStage, bigint]> } |
+      { 'err' : string }
+  >,
+  'getMyLeads' : ActorMethod<
+    [string],
+    { 'ok' : Array<Lead> } |
+      { 'err' : string }
+  >,
+  'getMyProfile' : ActorMethod<
+    [string],
+    { 'ok' : UserProfile } |
+      { 'err' : string }
+  >,
+  'getTotalLeadsCount' : ActorMethod<
+    [string],
+    { 'ok' : bigint } |
+      { 'err' : string }
+  >,
+  'getUserById' : ActorMethod<
+    [string, string],
+    { 'ok' : UserProfile } |
+      { 'err' : string }
+  >,
   'isCallerAdmin' : ActorMethod<[], boolean>,
-  'isCallerApproved' : ActorMethod<[], boolean>,
-  'listApprovals' : ActorMethod<[], Array<UserApprovalInfo>>,
-  'requestApproval' : ActorMethod<[], undefined>,
-  'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
-  'setApproval' : ActorMethod<[Principal, ApprovalStatus], undefined>,
-  'updateLead' : ActorMethod<[LeadId, Lead], undefined>,
-  'updateLeadStage' : ActorMethod<[LeadId, PipelineStage, string], undefined>,
-  'updateUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'login' : ActorMethod<
+    [string, string],
+    { 'ok' : string } |
+      { 'err' : string }
+  >,
+  'logout' : ActorMethod<[string], undefined>,
+  'updateLead' : ActorMethod<
+    [
+      string,
+      bigint,
+      string,
+      string,
+      string,
+      string,
+      string,
+      Requirement,
+      string,
+    ],
+    { 'ok' : Lead } |
+      { 'err' : string }
+  >,
+  'updateLeadStage' : ActorMethod<
+    [string, bigint, PipelineStage, string],
+    { 'ok' : Lead } |
+      { 'err' : string }
+  >,
+  'updateUser' : ActorMethod<
+    [string, string, string, string, string, string, string, boolean],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
+  'validateSession' : ActorMethod<[string], [] | [string]>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

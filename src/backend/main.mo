@@ -1,229 +1,57 @@
 
 import Map "mo:core/Map";
 import List "mo:core/List";
-import Array "mo:core/Array";
-import Iter "mo:core/Iter";
 import Text "mo:core/Text";
 import Nat "mo:core/Nat";
-import Order "mo:core/Order";
 import Time "mo:core/Time";
 import Runtime "mo:core/Runtime";
-import Principal "mo:core/Principal";
+import Migration "migration";
 import MixinAuthorization "mo:caffeineai-authorization/MixinAuthorization";
 import AccessControl "mo:caffeineai-authorization/access-control";
-import UserApproval "mo:caffeineai-user-approval/approval";
 
-
+(with migration = Migration.run)
 actor {
-  // Initialize the access control system
+
+  // Authorization mixin (retained for platform lint compliance)
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  // Initialize the user approval system
-  let approvalState = UserApproval.initState(accessControlState);
+  // ─────────────────────────────────────────────
+  //  TYPES
+  // ─────────────────────────────────────────────
 
-  // Approval functions for authenticated endpoints
-  public query ({ caller }) func isCallerApproved() : async Bool {
-    AccessControl.hasPermission(accessControlState, caller, #admin) or UserApproval.isApproved(approvalState, caller);
-  };
-
-  public shared ({ caller }) func requestApproval() : async () {
-    UserApproval.requestApproval(approvalState, caller);
-  };
-
-  public shared ({ caller }) func setApproval(user : Principal, status : UserApproval.ApprovalStatus) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can perform this action");
-    };
-    UserApproval.setApproval(approvalState, user, status);
-  };
-
-  public query ({ caller }) func listApprovals() : async [UserApproval.UserApprovalInfo] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can perform this action");
-    };
-    UserApproval.listApprovals(approvalState);
-  };
-
-  type District = Text;
-  module District {
-    public func compare(district1 : District, district2 : District) : Order.Order {
-      Text.compare(district1, district2);
-    };
-  };
-
-  let districts = List.empty<District>();
-  let defaultDistricts = [
-    "Angul",
-    "Balangir",
-    "Balasore",
-    "Bargarh",
-    "Bhadrak",
-    "Boudh",
-    "Cuttack",
-    "Deogarh",
-    "Dhenkanal",
-    "Gajapati",
-    "Ganjam",
-    "Jagatsinghpur",
-    "Jajpur",
-    "Jharsuguda",
-    "Kalahandi",
-    "Kandhamal",
-    "Kendrapara",
-    "Kendujhar",
-    "Khordha",
-    "Koraput",
-    "Malkangiri",
-    "Mayurbhanj",
-    "Nabarangpur",
-    "Nayagarh",
-    "Nuapada",
-    "Puri",
-    "Rayagada",
-    "Sambalpur",
-    "Subarnapur",
-    "Sundargarh"
-  ];
-
-  districts.addAll(defaultDistricts.values());
-
-  type UserId = Principal;
-
-  type UserRole = {
+  public type UserRole = {
     #admin;
+    #backoffice;
     #sales;
-    #operations;
+    #operation;
   };
 
-  type UserProfile = {
-    principal : UserId;
-    name : Text;
-    role : UserRole;
-    district : District;
-    phone : Text;
-    email : Text;
+  public type UserProfile = {
+    userId    : Text;
+    passwordHash : Text; // stored as plaintext for now
+    name      : Text;
+    role      : UserRole;
+    district  : Text;
+    phone     : Text;
+    email     : Text;
+    whatsAppNumber : Text;
+    isActive  : Bool;
   };
 
-  module UserProfile {
-    public func compare(profile1 : UserProfile, profile2 : UserProfile) : Order.Order {
-      Text.compare(profile1.name, profile2.name);
-    };
+  type SessionData = {
+    userId    : Text;
+    createdAt : Time.Time;
   };
-
-  let userProfiles = Map.empty<Principal, UserProfile>();
-
-  // Helper function to check if user is admin
-  func isAdmin(caller : Principal) : Bool {
-    switch (userProfiles.get(caller)) {
-      case (?profile) { profile.role == #admin };
-      case null { false };
-    };
-  };
-
-  // Helper function to check if user is operations
-  func isOperations(caller : Principal) : Bool {
-    switch (userProfiles.get(caller)) {
-      case (?profile) { profile.role == #operations };
-      case null { false };
-    };
-  };
-
-  // Helper function to check if user is sales
-  func isSales(caller : Principal) : Bool {
-    switch (userProfiles.get(caller)) {
-      case (?profile) { profile.role == #sales };
-      case null { false };
-    };
-  };
-
-  // Helper function to check if user has admin or operations role
-  func isAdminOrOperations(caller : Principal) : Bool {
-    isAdmin(caller) or isOperations(caller);
-  };
-
-  // Helper function to validate user exists and has correct role
-  func validateUserRole(userId : Principal, expectedRole : UserRole) : Bool {
-    switch (userProfiles.get(userId)) {
-      case (?profile) { profile.role == expectedRole };
-      case null { false };
-    };
-  };
-
-  public shared ({ caller }) func addUserProfile(profile : UserProfile) : async () {
-    // Only admins can create user profiles directly
-    // Regular users must go through approval process and cannot set their own role
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can create user profiles");
-    };
-    
-    // Verify the profile is for an approved user or admin is creating it
-    if (not (UserApproval.isApproved(approvalState, profile.principal) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Can only create profiles for approved users");
-    };
-
-    let newProfile : UserProfile = {
-      profile with principal = profile.principal
-    };
-    userProfiles.add(profile.principal, newProfile);
-  };
-
-  public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can view profiles");
-    };
-    userProfiles.get(caller);
-  };
-
-  public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can view profiles");
-    };
-    if (caller != user and not isAdmin(caller)) {
-      Runtime.trap("Unauthorized: Can only view your own profile unless you are an admin");
-    };
-    userProfiles.get(user);
-  };
-
-  public shared ({ caller }) func updateUserProfile(profile : UserProfile) : async () {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can update profiles");
-    };
-    
-    // Get existing profile
-    let existingProfile = switch (userProfiles.get(caller)) {
-      case (?p) { p };
-      case null {
-        Runtime.trap("Unauthorized: Profile does not exist. Please contact admin to create a profile.");
-      };
-    };
-
-    // Users cannot change their own role - only admins can do that
-    if (profile.role != existingProfile.role and not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can change user roles");
-    };
-
-    // Users can only update their own profile unless they are admin
-    if (caller != profile.principal and not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Can only update your own profile unless you are an admin");
-    };
-
-    let updatedProfile : UserProfile = {
-      profile with principal = caller
-    };
-    userProfiles.add(caller, updatedProfile);
-  };
-
-  type LeadId = Nat;
 
   public type Requirement = {
-    systemType : Text;
-    panelSize : Text;
+    systemType     : Text;
+    panelSize      : Text;
     estimatedValue : Nat;
-    notes : Text;
+    notes          : Text;
   };
 
-  type PipelineStage = {
+  public type PipelineStage = {
     #inquiry;
     #surveyScheduled;
     #bookingConfirmed;
@@ -232,430 +60,555 @@ actor {
     #closedLost;
   };
 
+  public type Remark = {
+    addedBy  : Text; // userId
+    addedAt  : Time.Time;
+    content  : Text;
+  };
+
   public type Lead = {
-    id : LeadId;
-    customerName : Text;
-    phone : Text;
-    email : Text;
-    address : Text;
-    district : District;
-    requirements : Requirement;
-    assignedSalesPerson : ?UserId;
-    assignedOperationsPerson : ?UserId;
-    createdBy : UserId;
-    createdAt : Time.Time;
-    updatedAt : Time.Time;
-    stage : PipelineStage;
-    notes : Text;
+    id                      : Nat;
+    customerName            : Text;
+    phone                   : Text;
+    email                   : Text;
+    address                 : Text;
+    district                : Text;
+    requirements            : Requirement;
+    assignedSalesPerson     : ?Text; // userId
+    assignedOperationsPerson : ?Text; // userId
+    createdBy               : Text; // userId
+    createdAt               : Time.Time;
+    updatedAt               : Time.Time;
+    stage                   : PipelineStage;
+    notes                   : Text;
+    remarks                 : [Remark];
   };
 
-  var nextLeadId = 1;
-  let leads = Map.empty<LeadId, Lead>();
+  // ─────────────────────────────────────────────
+  //  STATE
+  // ─────────────────────────────────────────────
 
-  // Helper function to check if caller can access a lead
-  func canAccessLead(caller : Principal, lead : Lead) : Bool {
-    if (isAdmin(caller)) {
-      return true;
+  let users    = Map.empty<Text, UserProfile>();
+  let sessions = Map.empty<Text, SessionData>();
+  let leads    = Map.empty<Nat, Lead>();
+  let districts = List.empty<Text>();
+  var nextLeadId : Nat = 1;
+
+  // ─────────────────────────────────────────────
+  //  INIT — seed admin + districts
+  // ─────────────────────────────────────────────
+
+  let adminProfile : UserProfile = {
+    userId       = "admin";
+    passwordHash = "Admin@1234";
+    name         = "Administrator";
+    role         = #admin;
+    district     = "";
+    phone        = "";
+    email        = "";
+    whatsAppNumber = "";
+    isActive     = true;
+  };
+  users.add("admin", adminProfile);
+
+  let defaultDistricts = [
+    "Angul", "Balangir", "Balasore", "Bargarh", "Bhadrak",
+    "Boudh", "Cuttack", "Deogarh", "Dhenkanal", "Gajapati",
+    "Ganjam", "Jagatsinghpur", "Jajpur", "Jharsuguda", "Kalahandi",
+    "Kandhamal", "Kendrapara", "Kendujhar", "Khordha", "Koraput",
+    "Malkangiri", "Mayurbhanj", "Nabarangpur", "Nayagarh", "Nuapada",
+    "Puri", "Rayagada", "Sambalpur", "Subarnapur", "Sundargarh"
+  ];
+  districts.addAll(defaultDistricts.values());
+
+  // ─────────────────────────────────────────────
+  //  INTERNAL HELPERS
+  // ─────────────────────────────────────────────
+
+  let sessionTtlNanos : Int = 24 * 60 * 60 * 1_000_000_000; // 24 hours
+
+  func generateToken(userId : Text) : Text {
+    let ts = Time.now().toText();
+    userId # "_" # ts;
+  };
+
+  // Returns ?userId if token is valid and not expired
+  func resolveSession(token : Text) : ?Text {
+    switch (sessions.get(token)) {
+      case null { null };
+      case (?sd) {
+        let age : Int = Time.now() - sd.createdAt;
+        if (age > sessionTtlNanos) {
+          sessions.remove(token);
+          null;
+        } else {
+          ?sd.userId;
+        };
+      };
     };
-    if (isOperations(caller)) {
-      return true;
+  };
+
+  // Returns ?UserProfile if session is valid
+  func getSessionUser(token : Text) : ?UserProfile {
+    switch (resolveSession(token)) {
+      case null { null };
+      case (?uid) { users.get(uid) };
     };
-    // Sales can access their own leads
-    if (lead.createdBy == caller) {
-      return true;
+  };
+
+  func requireSession(token : Text) : UserProfile {
+    switch (getSessionUser(token)) {
+      case null { Runtime.trap("Unauthorized: invalid or expired session") };
+      case (?u) {
+        if (not u.isActive) { Runtime.trap("Unauthorized: account is inactive") };
+        u;
+      };
     };
-    if (lead.assignedSalesPerson == ?caller) {
-      return true;
-    };
-    if (lead.assignedOperationsPerson == ?caller) {
+  };
+
+  func requireAdmin(token : Text) : UserProfile {
+    let u = requireSession(token);
+    if (u.role != #admin) { Runtime.trap("Unauthorized: admin access required") };
+    u;
+  };
+
+  // Admin or backoffice can assign leads
+  func canAssignLeads(role : UserRole) : Bool {
+    role == #admin or role == #backoffice;
+  };
+
+  // Admin, backoffice, and operation can view all leads
+  func canViewAllLeads(role : UserRole) : Bool {
+    role == #admin or role == #backoffice or role == #operation;
+  };
+
+  // Sales can only view their own assigned leads
+  func canAccessLead(userId : Text, role : UserRole, lead : Lead) : Bool {
+    if (canViewAllLeads(role)) { return true };
+    lead.assignedSalesPerson == ?userId or lead.createdBy == userId;
+  };
+
+  func canModifyLead(userId : Text, role : UserRole, lead : Lead) : Bool {
+    if (role == #admin or role == #operation or role == #backoffice) { return true };
+    if (role == #sales and (lead.assignedSalesPerson == ?userId or lead.createdBy == userId)) {
       return true;
     };
     false;
   };
 
-  // Helper function to check if caller can modify a lead
-  func canModifyLead(caller : Principal, lead : Lead) : Bool {
-    if (isAdmin(caller)) {
-      return true;
+  // ─────────────────────────────────────────────
+  //  AUTHENTICATION
+  // ─────────────────────────────────────────────
+
+  public shared func login(username : Text, password : Text) : async { #ok : Text; #err : Text } {
+    switch (users.get(username)) {
+      case null { #err("Invalid username or password") };
+      case (?u) {
+        if (not u.isActive) { return #err("Account is inactive. Contact admin.") };
+        if (u.passwordHash != password) { return #err("Invalid username or password") };
+        let token = generateToken(username);
+        let sd : SessionData = { userId = username; createdAt = Time.now() };
+        sessions.add(token, sd);
+        #ok(token);
+      };
     };
-    if (isOperations(caller)) {
-      return true;
-    };
-    // Sales can modify their own leads
-    if (isSales(caller) and (lead.createdBy == caller or lead.assignedSalesPerson == ?caller)) {
-      return true;
-    };
-    false;
   };
 
-  public shared ({ caller }) func addLead(input : Lead) : async LeadId {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can add leads");
-    };
-    // Only sales and operations can add leads
-    if (not (isSales(caller) or isOperations(caller) or isAdmin(caller))) {
-      Runtime.trap("Unauthorized: Only sales staff, operations, or admins can add leads");
-    };
+  public shared func logout(sessionToken : Text) : async () {
+    sessions.remove(sessionToken);
+  };
 
-    // Validate assigned users if provided
-    switch (input.assignedSalesPerson) {
-      case (?salesPerson) {
-        if (not validateUserRole(salesPerson, #sales)) {
-          Runtime.trap("Invalid assignment: Assigned sales person must have sales role");
-        };
-      };
+  public query func validateSession(sessionToken : Text) : async ?Text {
+    resolveSession(sessionToken);
+  };
+
+  // ─────────────────────────────────────────────
+  //  USER MANAGEMENT
+  // ─────────────────────────────────────────────
+
+  public shared func createUser(
+    sessionToken  : Text,
+    userId        : Text,
+    password      : Text,
+    name          : Text,
+    role          : UserRole,
+    district      : Text,
+    phone         : Text,
+    email         : Text,
+    whatsAppNumber : Text
+  ) : async { #ok : (); #err : Text } {
+    ignore requireAdmin(sessionToken);
+    if (userId == "") { return #err("userId cannot be empty") };
+    switch (users.get(userId)) {
+      case (?_) { return #err("User ID already exists") };
       case null {};
     };
-
-    switch (input.assignedOperationsPerson) {
-      case (?operationsPerson) {
-        if (not validateUserRole(operationsPerson, #operations)) {
-          Runtime.trap("Invalid assignment: Assigned operations person must have operations role");
-        };
-      };
-      case null {};
+    let profile : UserProfile = {
+      userId; passwordHash = password; name; role;
+      district; phone; email; whatsAppNumber; isActive = true;
     };
+    users.add(userId, profile);
+    #ok(());
+  };
 
-    let leadId = nextLeadId;
+  public shared func updateUser(
+    sessionToken  : Text,
+    userId        : Text,
+    name          : Text,
+    district      : Text,
+    phone         : Text,
+    email         : Text,
+    whatsAppNumber : Text,
+    isActive      : Bool
+  ) : async { #ok : (); #err : Text } {
+    ignore requireAdmin(sessionToken);
+    switch (users.get(userId)) {
+      case null { #err("User not found") };
+      case (?existing) {
+        let updated : UserProfile = {
+          existing with
+          name; district; phone; email; whatsAppNumber; isActive;
+        };
+        users.add(userId, updated);
+        #ok(());
+      };
+    };
+  };
+
+  public shared func changePassword(
+    sessionToken : Text,
+    userId       : Text,
+    newPassword  : Text
+  ) : async { #ok : (); #err : Text } {
+    let caller = requireSession(sessionToken);
+    // Admin can change anyone's; user can only change their own
+    if (caller.role != #admin and caller.userId != userId) {
+      return #err("Unauthorized: you can only change your own password");
+    };
+    switch (users.get(userId)) {
+      case null { #err("User not found") };
+      case (?existing) {
+        let updated : UserProfile = { existing with passwordHash = newPassword };
+        users.add(userId, updated);
+        #ok(());
+      };
+    };
+  };
+
+  public query func getAllUsers(sessionToken : Text) : async { #ok : [UserProfile]; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (caller.role != #admin) { return #err("Unauthorized: admin access required") };
+    #ok(users.values().toArray());
+  };
+
+  public query func getUserById(sessionToken : Text, userId : Text) : async { #ok : UserProfile; #err : Text } {
+    ignore requireSession(sessionToken);
+    switch (users.get(userId)) {
+      case null { #err("User not found") };
+      case (?u) { #ok(u) };
+    };
+  };
+
+  public query func getMyProfile(sessionToken : Text) : async { #ok : UserProfile; #err : Text } {
+    let caller = requireSession(sessionToken);
+    #ok(caller);
+  };
+
+  // ─────────────────────────────────────────────
+  //  LEADS
+  // ─────────────────────────────────────────────
+
+  public shared func addLead(
+    sessionToken  : Text,
+    customerName  : Text,
+    phone         : Text,
+    email         : Text,
+    address       : Text,
+    district      : Text,
+    requirements  : Requirement,
+    notes         : Text
+  ) : async { #ok : Lead; #err : Text } {
+    let caller = requireSession(sessionToken);
+    let id = nextLeadId;
     nextLeadId += 1;
-
-    let newLead : Lead = {
-      input with
-      id = leadId;
-      createdBy = caller;
+    let lead : Lead = {
+      id;
+      customerName; phone; email; address; district;
+      requirements; notes;
+      assignedSalesPerson      = null;
+      assignedOperationsPerson = null;
+      createdBy = caller.userId;
       createdAt = Time.now();
       updatedAt = Time.now();
-      stage = #inquiry;
-      assignedSalesPerson = input.assignedSalesPerson;
-      assignedOperationsPerson = input.assignedOperationsPerson;
-      requirements = input.requirements;
-      notes = input.notes;
+      stage     = #inquiry;
+      remarks   = [];
     };
-
-    leads.add(leadId, newLead);
-    leadId;
+    leads.add(id, lead);
+    #ok(lead);
   };
 
-  public shared ({ caller }) func updateLead(leadId : LeadId, input : Lead) : async () {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can update leads");
-    };
-
+  public shared func updateLead(
+    sessionToken  : Text,
+    leadId        : Nat,
+    customerName  : Text,
+    phone         : Text,
+    email         : Text,
+    address       : Text,
+    district      : Text,
+    requirements  : Requirement,
+    notes         : Text
+  ) : async { #ok : Lead; #err : Text } {
+    let caller = requireSession(sessionToken);
     switch (leads.get(leadId)) {
-      case null {
-        Runtime.trap("Lead not found");
-      };
-      case (?existingLead) {
-        if (not canModifyLead(caller, existingLead)) {
-          Runtime.trap("Unauthorized: You can only update your own leads or you must be an admin/operations");
+      case null { #err("Lead not found") };
+      case (?existing) {
+        if (not canModifyLead(caller.userId, caller.role, existing)) {
+          return #err("Unauthorized: you cannot modify this lead");
         };
-
-        // Validate assigned users if provided
-        switch (input.assignedSalesPerson) {
-          case (?salesPerson) {
-            if (not validateUserRole(salesPerson, #sales)) {
-              Runtime.trap("Invalid assignment: Assigned sales person must have sales role");
-            };
-          };
-          case null {};
-        };
-
-        switch (input.assignedOperationsPerson) {
-          case (?operationsPerson) {
-            if (not validateUserRole(operationsPerson, #operations)) {
-              Runtime.trap("Invalid assignment: Assigned operations person must have operations role");
-            };
-          };
-          case null {};
-        };
-
-        let updatedLead : Lead = {
-          input with
-          id = leadId;
-          createdBy = existingLead.createdBy;
-          createdAt = existingLead.createdAt;
+        let updated : Lead = {
+          existing with
+          customerName; phone; email; address; district;
+          requirements; notes;
           updatedAt = Time.now();
         };
-
-        leads.add(leadId, updatedLead);
+        leads.add(leadId, updated);
+        #ok(updated);
       };
     };
   };
 
-  public shared ({ caller }) func updateLeadStage(leadId : LeadId, stage : PipelineStage, notes : Text) : async () {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can update lead stages");
-    };
-
+  public shared func updateLeadStage(
+    sessionToken : Text,
+    leadId       : Nat,
+    stage        : PipelineStage,
+    notes        : Text
+  ) : async { #ok : Lead; #err : Text } {
+    let caller = requireSession(sessionToken);
     switch (leads.get(leadId)) {
-      case null {
-        Runtime.trap("Lead not found");
-      };
-      case (?existingLead) {
-        if (not canModifyLead(caller, existingLead)) {
-          Runtime.trap("Unauthorized: You can only update stages for your own leads or you must be an admin/operations");
+      case null { #err("Lead not found") };
+      case (?existing) {
+        if (not canModifyLead(caller.userId, caller.role, existing)) {
+          return #err("Unauthorized: you cannot update this lead");
         };
+        let updated : Lead = {
+          existing with stage; notes; updatedAt = Time.now();
+        };
+        leads.add(leadId, updated);
+        #ok(updated);
+      };
+    };
+  };
 
-        let updatedLead : Lead = {
-          existingLead with
-          stage = stage;
-          notes = notes;
+  public shared func assignLeadToSales(
+    sessionToken : Text,
+    leadId       : Nat,
+    salesUserId  : Text
+  ) : async { #ok : Lead; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (not canAssignLeads(caller.role)) {
+      return #err("Unauthorized: only admin and backoffice can assign leads");
+    };
+    // Validate target user exists and has sales role
+    switch (users.get(salesUserId)) {
+      case null { return #err("Sales user not found") };
+      case (?u) {
+        if (u.role != #sales) {
+          return #err("Target user does not have the sales role");
+        };
+      };
+    };
+    switch (leads.get(leadId)) {
+      case null { #err("Lead not found") };
+      case (?existing) {
+        let updated : Lead = {
+          existing with
+          assignedSalesPerson = ?salesUserId;
           updatedAt = Time.now();
         };
-
-        leads.add(leadId, updatedLead);
+        leads.add(leadId, updated);
+        #ok(updated);
       };
     };
   };
 
-  public shared ({ caller }) func assignLeadToSales(leadId : LeadId, salesPerson : UserId) : async () {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can assign leads");
+  public shared func assignLeadToOperations(
+    sessionToken       : Text,
+    leadId             : Nat,
+    operationsUserId   : Text
+  ) : async { #ok : Lead; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (not canAssignLeads(caller.role)) {
+      return #err("Unauthorized: only admin and backoffice can assign leads");
     };
-    // Only operations and admin can assign leads
-    if (not isAdminOrOperations(caller)) {
-      Runtime.trap("Unauthorized: Only operations staff or admins can assign leads");
-    };
-
-    // Validate that the sales person has the sales role
-    if (not validateUserRole(salesPerson, #sales)) {
-      Runtime.trap("Invalid assignment: User must have sales role");
-    };
-
-    switch (leads.get(leadId)) {
-      case null {
-        Runtime.trap("Lead not found");
+    // Validate target user exists and has operation role
+    switch (users.get(operationsUserId)) {
+      case null { return #err("Operations user not found") };
+      case (?u) {
+        if (u.role != #operation) {
+          return #err("Target user does not have the operation role");
+        };
       };
-      case (?existingLead) {
-        let updatedLead : Lead = {
-          existingLead with
-          assignedSalesPerson = ?salesPerson;
+    };
+    switch (leads.get(leadId)) {
+      case null { #err("Lead not found") };
+      case (?existing) {
+        let updated : Lead = {
+          existing with
+          assignedOperationsPerson = ?operationsUserId;
           updatedAt = Time.now();
         };
-
-        leads.add(leadId, updatedLead);
+        leads.add(leadId, updated);
+        #ok(updated);
       };
     };
   };
 
-  public shared ({ caller }) func assignLeadToOperations(leadId : LeadId, operationsPerson : UserId) : async () {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can assign leads");
-    };
-    // Only operations and admin can assign leads
-    if (not isAdminOrOperations(caller)) {
-      Runtime.trap("Unauthorized: Only operations staff or admins can assign leads");
-    };
-
-    // Validate that the operations person has the operations role
-    if (not validateUserRole(operationsPerson, #operations)) {
-      Runtime.trap("Invalid assignment: User must have operations role");
-    };
-
+  public query func getLeadById(sessionToken : Text, leadId : Nat) : async { #ok : Lead; #err : Text } {
+    let caller = requireSession(sessionToken);
     switch (leads.get(leadId)) {
-      case null {
-        Runtime.trap("Lead not found");
-      };
-      case (?existingLead) {
-        let updatedLead : Lead = {
-          existingLead with
-          assignedOperationsPerson = ?operationsPerson;
-          updatedAt = Time.now();
-        };
-
-        leads.add(leadId, updatedLead);
-      };
-    };
-  };
-
-  public query ({ caller }) func getLeadById(leadId : LeadId) : async ?Lead {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can view leads");
-    };
-
-    switch (leads.get(leadId)) {
-      case null { null };
+      case null { #err("Lead not found") };
       case (?lead) {
-        if (canAccessLead(caller, lead)) {
-          ?lead;
-        } else {
-          Runtime.trap("Unauthorized: You can only view leads you are associated with");
+        if (not canAccessLead(caller.userId, caller.role, lead)) {
+          return #err("Unauthorized: you cannot access this lead");
         };
+        #ok(lead);
       };
     };
   };
 
-  public query ({ caller }) func getLeadsByDistrict(district : District) : async [Lead] {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can view leads");
+  public query func getAllLeads(sessionToken : Text) : async { #ok : [Lead]; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (not canViewAllLeads(caller.role)) {
+      return #err("Unauthorized: only admin, backoffice, and operation can view all leads");
     };
-    // Only admin and operations can view leads by district
-    if (not isAdminOrOperations(caller)) {
-      Runtime.trap("Unauthorized: Only operations staff or admins can view leads by district");
-    };
-
-    leads.values().toArray().filter(func(lead) { Text.equal(lead.district, district) });
+    #ok(leads.values().toArray());
   };
 
-  public query ({ caller }) func getLeadsByStage(stage : PipelineStage) : async [Lead] {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can view leads");
+  public query func getMyLeads(sessionToken : Text) : async { #ok : [Lead]; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (canViewAllLeads(caller.role)) {
+      return #ok(leads.values().toArray());
     };
-    // Only admin and operations can view leads by stage
-    if (not isAdminOrOperations(caller)) {
-      Runtime.trap("Unauthorized: Only operations staff or admins can view leads by stage");
-    };
-
-    leads.values().toArray().filter(func(lead) { lead.stage == stage });
-  };
-
-  public query ({ caller }) func getLeadsBySalesPerson(salesPerson : UserId) : async [Lead] {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can view leads");
-    };
-    // Only admin and operations can view leads by sales person, or the sales person themselves
-    if (not (isAdminOrOperations(caller) or caller == salesPerson)) {
-      Runtime.trap("Unauthorized: You can only view your own leads or you must be an admin/operations");
-    };
-
-    leads.values().toArray().filter(func(lead) { lead.assignedSalesPerson == ?salesPerson });
-  };
-
-  public query ({ caller }) func getMyLeads() : async [Lead] {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can view leads");
-    };
-
-    leads.values().toArray().filter(func(lead) {
-      lead.createdBy == caller or lead.assignedSalesPerson == ?caller or lead.assignedOperationsPerson == ?caller
+    // Sales — return only assigned leads
+    let mine = leads.values().toArray().filter(func(l : Lead) : Bool {
+      l.assignedSalesPerson == ?caller.userId or l.createdBy == caller.userId
     });
+    #ok(mine);
   };
 
-  public query ({ caller }) func getAllLeads() : async [Lead] {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can view leads");
+  public query func getLeadsByDistrict(sessionToken : Text, district : Text) : async { #ok : [Lead]; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (not canViewAllLeads(caller.role)) {
+      return #err("Unauthorized: only admin, backoffice, and operation can filter by district");
     };
-    // Only admin and operations can view all leads
-    if (not isAdminOrOperations(caller)) {
-      Runtime.trap("Unauthorized: Only operations staff or admins can view all leads");
-    };
-
-    leads.values().toArray();
+    #ok(leads.values().toArray().filter(func(l : Lead) : Bool { Text.equal(l.district, district) }));
   };
 
-  // KPI queries - admin and operations only
-  public query ({ caller }) func getTotalLeadsCount() : async Nat {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can view KPIs");
+  public query func getLeadsByStage(sessionToken : Text, stage : PipelineStage) : async { #ok : [Lead]; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (not canViewAllLeads(caller.role)) {
+      return #err("Unauthorized: only admin, backoffice, and operation can filter by stage");
     };
-    if (not isAdminOrOperations(caller)) {
-      Runtime.trap("Unauthorized: Only operations staff or admins can view KPIs");
-    };
-
-    leads.size();
+    #ok(leads.values().toArray().filter(func(l : Lead) : Bool { l.stage == stage }));
   };
 
-  public query ({ caller }) func getLeadsAddedToday() : async Nat {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can view KPIs");
+  public query func getTotalLeadsCount(sessionToken : Text) : async { #ok : Nat; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (not canViewAllLeads(caller.role)) {
+      return #err("Unauthorized: admin, backoffice, or operation access required");
     };
-    if (not isAdminOrOperations(caller)) {
-      Runtime.trap("Unauthorized: Only operations staff or admins can view KPIs");
-    };
+    #ok(leads.size());
+  };
 
+  public query func getLeadsAddedToday(sessionToken : Text) : async { #ok : Nat; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (not canViewAllLeads(caller.role)) {
+      return #err("Unauthorized: admin, backoffice, or operation access required");
+    };
     let now = Time.now();
-    let oneDayInNanos = 24 * 60 * 60 * 1_000_000_000;
-    let todayStart = now - oneDayInNanos;
-
-    leads.values().toArray().filter(func(lead) { lead.createdAt >= todayStart }).size();
+    let oneDayNanos : Int = 24 * 60 * 60 * 1_000_000_000;
+    let todayStart  : Int = now - oneDayNanos;
+    let count = leads.values().toArray().filter(func(l : Lead) : Bool {
+      l.createdAt >= todayStart
+    }).size();
+    #ok(count);
   };
 
-  public query ({ caller }) func getLeadsByStageCount() : async [(PipelineStage, Nat)] {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can view KPIs");
+  public query func getLeadsByStageCount(sessionToken : Text) : async { #ok : [(PipelineStage, Nat)]; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (not canViewAllLeads(caller.role)) {
+      return #err("Unauthorized: admin, backoffice, or operation access required");
     };
-    if (not isAdminOrOperations(caller)) {
-      Runtime.trap("Unauthorized: Only operations staff or admins can view KPIs");
-    };
-
-    let allLeads = leads.values().toArray();
-    [
-      (#inquiry, allLeads.filter(func(l) { l.stage == #inquiry }).size()),
-      (#surveyScheduled, allLeads.filter(func(l) { l.stage == #surveyScheduled }).size()),
-      (#bookingConfirmed, allLeads.filter(func(l) { l.stage == #bookingConfirmed }).size()),
-      (#installation, allLeads.filter(func(l) { l.stage == #installation }).size()),
-      (#closedWon, allLeads.filter(func(l) { l.stage == #closedWon }).size()),
-      (#closedLost, allLeads.filter(func(l) { l.stage == #closedLost }).size()),
-    ];
+    let all = leads.values().toArray();
+    #ok([
+      (#inquiry,          all.filter(func(l : Lead) : Bool { l.stage == #inquiry          }).size()),
+      (#surveyScheduled,  all.filter(func(l : Lead) : Bool { l.stage == #surveyScheduled  }).size()),
+      (#bookingConfirmed, all.filter(func(l : Lead) : Bool { l.stage == #bookingConfirmed }).size()),
+      (#installation,     all.filter(func(l : Lead) : Bool { l.stage == #installation     }).size()),
+      (#closedWon,        all.filter(func(l : Lead) : Bool { l.stage == #closedWon        }).size()),
+      (#closedLost,       all.filter(func(l : Lead) : Bool { l.stage == #closedLost       }).size()),
+    ]);
   };
 
-  public query ({ caller }) func getLeadsByDistrictCount() : async [(District, Nat)] {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can view KPIs");
+  public query func getLeadsByDistrictCount(sessionToken : Text) : async { #ok : [(Text, Nat)]; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (not canViewAllLeads(caller.role)) {
+      return #err("Unauthorized: admin, backoffice, or operation access required");
     };
-    if (not isAdminOrOperations(caller)) {
-      Runtime.trap("Unauthorized: Only operations staff or admins can view KPIs");
-    };
-
-    let allLeads = leads.values().toArray();
-    districts.toArray().map<District, (District, Nat)>(
-      func(district) {
-        (district, allLeads.filter(func(l) { Text.equal(l.district, district) }).size());
-      }
+    let all = leads.values().toArray();
+    #ok(
+      districts.toArray().map<Text, (Text, Nat)>(func(d : Text) : (Text, Nat) {
+        (d, all.filter(func(l : Lead) : Bool { Text.equal(l.district, d) }).size())
+      })
     );
   };
 
-  // Admin-only: Get all user profiles
-  public query ({ caller }) func getAllUserProfiles() : async [UserProfile] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can view all user profiles");
-    };
+  // ─────────────────────────────────────────────
+  //  REMARKS
+  // ─────────────────────────────────────────────
 
-    userProfiles.values().toArray();
+  public shared func addRemark(
+    sessionToken : Text,
+    leadId       : Nat,
+    content      : Text
+  ) : async { #ok : Lead; #err : Text } {
+    let caller = requireSession(sessionToken);
+    switch (leads.get(leadId)) {
+      case null { #err("Lead not found") };
+      case (?existing) {
+        if (not canAccessLead(caller.userId, caller.role, existing)) {
+          return #err("Unauthorized: you cannot access this lead");
+        };
+        let remark : Remark = {
+          addedBy = caller.userId;
+          addedAt = Time.now();
+          content;
+        };
+        // Prepend so newest-first
+        let updatedRemarks = [remark].concat(existing.remarks);
+        let updated : Lead = {
+          existing with
+          remarks   = updatedRemarks;
+          updatedAt = Time.now();
+        };
+        leads.add(leadId, updated);
+        #ok(updated);
+      };
+    };
   };
 
-  // Admin-only: Manage districts
-  public shared ({ caller }) func addDistrict(district : District) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only admins can add districts");
-    };
+  // ─────────────────────────────────────────────
+  //  DISTRICTS
+  // ─────────────────────────────────────────────
 
-    districts.add(district);
-  };
-
-  public query ({ caller }) func getAllDistricts() : async [District] {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can view districts");
-    };
-
+  public query func getAllDistricts() : async [Text] {
     districts.toArray();
   };
 
-  // Required by frontend: saveCallerUserProfile
-  public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    // This is an alias for updateUserProfile but ensures the profile is for the caller
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can save profiles");
-    };
-    
-    // Get existing profile
-    let existingProfile = switch (userProfiles.get(caller)) {
-      case (?p) { p };
-      case null {
-        Runtime.trap("Unauthorized: Profile does not exist. Please contact admin to create a profile.");
-      };
-    };
-
-    // Users cannot change their own role
-    if (profile.role != existingProfile.role) {
-      Runtime.trap("Unauthorized: Cannot change your own role");
-    };
-
-    let updatedProfile : UserProfile = {
-      profile with 
-      principal = caller;
-      role = existingProfile.role; // Ensure role cannot be changed
-    };
-    userProfiles.add(caller, updatedProfile);
+  public shared func addDistrict(sessionToken : Text, name : Text) : async { #ok : (); #err : Text } {
+    ignore requireAdmin(sessionToken);
+    districts.add(name);
+    #ok(());
   };
+
 };

@@ -8,25 +8,21 @@ export interface None {
 }
 export type Option<T> = Some<T> | None;
 export interface Lead {
-    id: LeadId;
+    id: bigint;
     customerName: string;
     createdAt: Time;
-    createdBy: UserId;
+    createdBy: string;
     email: string;
-    district: District;
+    district: string;
     updatedAt: Time;
     stage: PipelineStage;
-    assignedOperationsPerson?: UserId;
+    assignedOperationsPerson?: string;
     address: string;
     notes: string;
     phone: string;
     requirements: Requirement;
-    assignedSalesPerson?: UserId;
-}
-export type UserId = Principal;
-export interface UserApprovalInfo {
-    status: ApprovalStatus;
-    principal: Principal;
+    assignedSalesPerson?: string;
+    remarks: Array<Remark>;
 }
 export type Time = bigint;
 export interface Requirement {
@@ -35,20 +31,21 @@ export interface Requirement {
     estimatedValue: bigint;
     systemType: string;
 }
-export type LeadId = bigint;
-export type District = string;
+export interface Remark {
+    content: string;
+    addedAt: Time;
+    addedBy: string;
+}
 export interface UserProfile {
-    principal: UserId;
+    whatsAppNumber: string;
+    userId: string;
     name: string;
     role: UserRole;
+    isActive: boolean;
     email: string;
-    district: District;
+    district: string;
+    passwordHash: string;
     phone: string;
-}
-export enum ApprovalStatus {
-    pending = "pending",
-    approved = "approved",
-    rejected = "rejected"
 }
 export enum PipelineStage {
     closedWon = "closedWon",
@@ -60,8 +57,9 @@ export enum PipelineStage {
 }
 export enum UserRole {
     admin = "admin",
+    backoffice = "backoffice",
     sales = "sales",
-    operations = "operations"
+    operation = "operation"
 }
 export enum UserRole__1 {
     admin = "admin",
@@ -69,34 +67,171 @@ export enum UserRole__1 {
     guest = "guest"
 }
 export interface backendInterface {
-    addDistrict(district: District): Promise<void>;
-    addLead(input: Lead): Promise<LeadId>;
-    addUserProfile(profile: UserProfile): Promise<void>;
+    addDistrict(sessionToken: string, name: string): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    addLead(sessionToken: string, customerName: string, phone: string, email: string, address: string, district: string, requirements: Requirement, notes: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    addRemark(sessionToken: string, leadId: bigint, content: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     assignCallerUserRole(user: Principal, role: UserRole__1): Promise<void>;
-    assignLeadToOperations(leadId: LeadId, operationsPerson: UserId): Promise<void>;
-    assignLeadToSales(leadId: LeadId, salesPerson: UserId): Promise<void>;
-    getAllDistricts(): Promise<Array<District>>;
-    getAllLeads(): Promise<Array<Lead>>;
-    getAllUserProfiles(): Promise<Array<UserProfile>>;
-    getCallerUserProfile(): Promise<UserProfile | null>;
+    assignLeadToOperations(sessionToken: string, leadId: bigint, operationsUserId: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    assignLeadToSales(sessionToken: string, leadId: bigint, salesUserId: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    changePassword(sessionToken: string, userId: string, newPassword: string): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    createUser(sessionToken: string, userId: string, password: string, name: string, role: UserRole, district: string, phone: string, email: string, whatsAppNumber: string): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getAllDistricts(): Promise<Array<string>>;
+    getAllLeads(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: Array<Lead>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getAllUsers(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: Array<UserProfile>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     getCallerUserRole(): Promise<UserRole__1>;
-    getLeadById(leadId: LeadId): Promise<Lead | null>;
-    getLeadsAddedToday(): Promise<bigint>;
-    getLeadsByDistrict(district: District): Promise<Array<Lead>>;
-    getLeadsByDistrictCount(): Promise<Array<[District, bigint]>>;
-    getLeadsBySalesPerson(salesPerson: UserId): Promise<Array<Lead>>;
-    getLeadsByStage(stage: PipelineStage): Promise<Array<Lead>>;
-    getLeadsByStageCount(): Promise<Array<[PipelineStage, bigint]>>;
-    getMyLeads(): Promise<Array<Lead>>;
-    getTotalLeadsCount(): Promise<bigint>;
-    getUserProfile(user: Principal): Promise<UserProfile | null>;
+    getLeadById(sessionToken: string, leadId: bigint): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getLeadsAddedToday(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: bigint;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getLeadsByDistrict(sessionToken: string, district: string): Promise<{
+        __kind__: "ok";
+        ok: Array<Lead>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getLeadsByDistrictCount(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: Array<[string, bigint]>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getLeadsByStage(sessionToken: string, stage: PipelineStage): Promise<{
+        __kind__: "ok";
+        ok: Array<Lead>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getLeadsByStageCount(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: Array<[PipelineStage, bigint]>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getMyLeads(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: Array<Lead>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getMyProfile(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: UserProfile;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getTotalLeadsCount(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: bigint;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getUserById(sessionToken: string, userId: string): Promise<{
+        __kind__: "ok";
+        ok: UserProfile;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     isCallerAdmin(): Promise<boolean>;
-    isCallerApproved(): Promise<boolean>;
-    listApprovals(): Promise<Array<UserApprovalInfo>>;
-    requestApproval(): Promise<void>;
-    saveCallerUserProfile(profile: UserProfile): Promise<void>;
-    setApproval(user: Principal, status: ApprovalStatus): Promise<void>;
-    updateLead(leadId: LeadId, input: Lead): Promise<void>;
-    updateLeadStage(leadId: LeadId, stage: PipelineStage, notes: string): Promise<void>;
-    updateUserProfile(profile: UserProfile): Promise<void>;
+    login(username: string, password: string): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    logout(sessionToken: string): Promise<void>;
+    updateLead(sessionToken: string, leadId: bigint, customerName: string, phone: string, email: string, address: string, district: string, requirements: Requirement, notes: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    updateLeadStage(sessionToken: string, leadId: bigint, stage: PipelineStage, notes: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    updateUser(sessionToken: string, userId: string, name: string, district: string, phone: string, email: string, whatsAppNumber: string, isActive: boolean): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    validateSession(sessionToken: string): Promise<string | null>;
 }

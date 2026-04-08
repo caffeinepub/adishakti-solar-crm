@@ -90,25 +90,21 @@ export class ExternalBlob {
     }
 }
 export interface Lead {
-    id: LeadId;
+    id: bigint;
     customerName: string;
     createdAt: Time;
-    createdBy: UserId;
+    createdBy: string;
     email: string;
-    district: District;
+    district: string;
     updatedAt: Time;
     stage: PipelineStage;
-    assignedOperationsPerson?: UserId;
+    assignedOperationsPerson?: string;
     address: string;
     notes: string;
     phone: string;
     requirements: Requirement;
-    assignedSalesPerson?: UserId;
-}
-export type UserId = Principal;
-export interface UserApprovalInfo {
-    status: ApprovalStatus;
-    principal: Principal;
+    assignedSalesPerson?: string;
+    remarks: Array<Remark>;
 }
 export type Time = bigint;
 export interface Requirement {
@@ -117,20 +113,21 @@ export interface Requirement {
     estimatedValue: bigint;
     systemType: string;
 }
-export type LeadId = bigint;
-export type District = string;
+export interface Remark {
+    content: string;
+    addedAt: Time;
+    addedBy: string;
+}
 export interface UserProfile {
-    principal: UserId;
+    whatsAppNumber: string;
+    userId: string;
     name: string;
     role: UserRole;
+    isActive: boolean;
     email: string;
-    district: District;
+    district: string;
+    passwordHash: string;
     phone: string;
-}
-export enum ApprovalStatus {
-    pending = "pending",
-    approved = "approved",
-    rejected = "rejected"
 }
 export enum PipelineStage {
     closedWon = "closedWon",
@@ -142,8 +139,9 @@ export enum PipelineStage {
 }
 export enum UserRole {
     admin = "admin",
+    backoffice = "backoffice",
     sales = "sales",
-    operations = "operations"
+    operation = "operation"
 }
 export enum UserRole__1 {
     admin = "admin",
@@ -152,38 +150,175 @@ export enum UserRole__1 {
 }
 export interface backendInterface {
     _initializeAccessControl(): Promise<void>;
-    addDistrict(district: District): Promise<void>;
-    addLead(input: Lead): Promise<LeadId>;
-    addUserProfile(profile: UserProfile): Promise<void>;
+    addDistrict(sessionToken: string, name: string): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    addLead(sessionToken: string, customerName: string, phone: string, email: string, address: string, district: string, requirements: Requirement, notes: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    addRemark(sessionToken: string, leadId: bigint, content: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     assignCallerUserRole(user: Principal, role: UserRole__1): Promise<void>;
-    assignLeadToOperations(leadId: LeadId, operationsPerson: UserId): Promise<void>;
-    assignLeadToSales(leadId: LeadId, salesPerson: UserId): Promise<void>;
-    getAllDistricts(): Promise<Array<District>>;
-    getAllLeads(): Promise<Array<Lead>>;
-    getAllUserProfiles(): Promise<Array<UserProfile>>;
-    getCallerUserProfile(): Promise<UserProfile | null>;
+    assignLeadToOperations(sessionToken: string, leadId: bigint, operationsUserId: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    assignLeadToSales(sessionToken: string, leadId: bigint, salesUserId: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    changePassword(sessionToken: string, userId: string, newPassword: string): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    createUser(sessionToken: string, userId: string, password: string, name: string, role: UserRole, district: string, phone: string, email: string, whatsAppNumber: string): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getAllDistricts(): Promise<Array<string>>;
+    getAllLeads(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: Array<Lead>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getAllUsers(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: Array<UserProfile>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     getCallerUserRole(): Promise<UserRole__1>;
-    getLeadById(leadId: LeadId): Promise<Lead | null>;
-    getLeadsAddedToday(): Promise<bigint>;
-    getLeadsByDistrict(district: District): Promise<Array<Lead>>;
-    getLeadsByDistrictCount(): Promise<Array<[District, bigint]>>;
-    getLeadsBySalesPerson(salesPerson: UserId): Promise<Array<Lead>>;
-    getLeadsByStage(stage: PipelineStage): Promise<Array<Lead>>;
-    getLeadsByStageCount(): Promise<Array<[PipelineStage, bigint]>>;
-    getMyLeads(): Promise<Array<Lead>>;
-    getTotalLeadsCount(): Promise<bigint>;
-    getUserProfile(user: Principal): Promise<UserProfile | null>;
+    getLeadById(sessionToken: string, leadId: bigint): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getLeadsAddedToday(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: bigint;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getLeadsByDistrict(sessionToken: string, district: string): Promise<{
+        __kind__: "ok";
+        ok: Array<Lead>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getLeadsByDistrictCount(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: Array<[string, bigint]>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getLeadsByStage(sessionToken: string, stage: PipelineStage): Promise<{
+        __kind__: "ok";
+        ok: Array<Lead>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getLeadsByStageCount(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: Array<[PipelineStage, bigint]>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getMyLeads(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: Array<Lead>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getMyProfile(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: UserProfile;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getTotalLeadsCount(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: bigint;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    getUserById(sessionToken: string, userId: string): Promise<{
+        __kind__: "ok";
+        ok: UserProfile;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     isCallerAdmin(): Promise<boolean>;
-    isCallerApproved(): Promise<boolean>;
-    listApprovals(): Promise<Array<UserApprovalInfo>>;
-    requestApproval(): Promise<void>;
-    saveCallerUserProfile(profile: UserProfile): Promise<void>;
-    setApproval(user: Principal, status: ApprovalStatus): Promise<void>;
-    updateLead(leadId: LeadId, input: Lead): Promise<void>;
-    updateLeadStage(leadId: LeadId, stage: PipelineStage, notes: string): Promise<void>;
-    updateUserProfile(profile: UserProfile): Promise<void>;
+    login(username: string, password: string): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    logout(sessionToken: string): Promise<void>;
+    updateLead(sessionToken: string, leadId: bigint, customerName: string, phone: string, email: string, address: string, district: string, requirements: Requirement, notes: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    updateLeadStage(sessionToken: string, leadId: bigint, stage: PipelineStage, notes: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    updateUser(sessionToken: string, userId: string, name: string, district: string, phone: string, email: string, whatsAppNumber: string, isActive: boolean): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    validateSession(sessionToken: string): Promise<string | null>;
 }
-import type { ApprovalStatus as _ApprovalStatus, District as _District, Lead as _Lead, LeadId as _LeadId, PipelineStage as _PipelineStage, Requirement as _Requirement, Time as _Time, UserApprovalInfo as _UserApprovalInfo, UserId as _UserId, UserProfile as _UserProfile, UserRole as _UserRole, UserRole__1 as _UserRole__1 } from "./declarations/backend.did.d.ts";
+import type { Lead as _Lead, PipelineStage as _PipelineStage, Remark as _Remark, Requirement as _Requirement, Time as _Time, UserProfile as _UserProfile, UserRole as _UserRole, UserRole__1 as _UserRole__1 } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _initializeAccessControl(): Promise<void> {
@@ -200,91 +335,161 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async addDistrict(arg0: District): Promise<void> {
+    async addDistrict(arg0: string, arg1: string): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.addDistrict(arg0);
-                return result;
+                const result = await this.actor.addDistrict(arg0, arg1);
+                return from_candid_variant_n1(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.addDistrict(arg0);
-            return result;
+            const result = await this.actor.addDistrict(arg0, arg1);
+            return from_candid_variant_n1(this._uploadFile, this._downloadFile, result);
         }
     }
-    async addLead(arg0: Lead): Promise<LeadId> {
+    async addLead(arg0: string, arg1: string, arg2: string, arg3: string, arg4: string, arg5: string, arg6: Requirement, arg7: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.addLead(to_candid_Lead_n1(this._uploadFile, this._downloadFile, arg0));
-                return result;
+                const result = await this.actor.addLead(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                return from_candid_variant_n2(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.addLead(to_candid_Lead_n1(this._uploadFile, this._downloadFile, arg0));
-            return result;
+            const result = await this.actor.addLead(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+            return from_candid_variant_n2(this._uploadFile, this._downloadFile, result);
         }
     }
-    async addUserProfile(arg0: UserProfile): Promise<void> {
+    async addRemark(arg0: string, arg1: bigint, arg2: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.addUserProfile(to_candid_UserProfile_n5(this._uploadFile, this._downloadFile, arg0));
-                return result;
+                const result = await this.actor.addRemark(arg0, arg1, arg2);
+                return from_candid_variant_n2(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.addUserProfile(to_candid_UserProfile_n5(this._uploadFile, this._downloadFile, arg0));
-            return result;
+            const result = await this.actor.addRemark(arg0, arg1, arg2);
+            return from_candid_variant_n2(this._uploadFile, this._downloadFile, result);
         }
     }
     async assignCallerUserRole(arg0: Principal, arg1: UserRole__1): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole__1_n9(this._uploadFile, this._downloadFile, arg1));
+                const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole__1_n8(this._uploadFile, this._downloadFile, arg1));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole__1_n9(this._uploadFile, this._downloadFile, arg1));
+            const result = await this.actor.assignCallerUserRole(arg0, to_candid_UserRole__1_n8(this._uploadFile, this._downloadFile, arg1));
             return result;
         }
     }
-    async assignLeadToOperations(arg0: LeadId, arg1: UserId): Promise<void> {
+    async assignLeadToOperations(arg0: string, arg1: bigint, arg2: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.assignLeadToOperations(arg0, arg1);
-                return result;
+                const result = await this.actor.assignLeadToOperations(arg0, arg1, arg2);
+                return from_candid_variant_n2(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.assignLeadToOperations(arg0, arg1);
-            return result;
+            const result = await this.actor.assignLeadToOperations(arg0, arg1, arg2);
+            return from_candid_variant_n2(this._uploadFile, this._downloadFile, result);
         }
     }
-    async assignLeadToSales(arg0: LeadId, arg1: UserId): Promise<void> {
+    async assignLeadToSales(arg0: string, arg1: bigint, arg2: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.assignLeadToSales(arg0, arg1);
-                return result;
+                const result = await this.actor.assignLeadToSales(arg0, arg1, arg2);
+                return from_candid_variant_n2(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.assignLeadToSales(arg0, arg1);
-            return result;
+            const result = await this.actor.assignLeadToSales(arg0, arg1, arg2);
+            return from_candid_variant_n2(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getAllDistricts(): Promise<Array<District>> {
+    async changePassword(arg0: string, arg1: string, arg2: string): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.changePassword(arg0, arg1, arg2);
+                return from_candid_variant_n1(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.changePassword(arg0, arg1, arg2);
+            return from_candid_variant_n1(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async createUser(arg0: string, arg1: string, arg2: string, arg3: string, arg4: UserRole, arg5: string, arg6: string, arg7: string, arg8: string): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.createUser(arg0, arg1, arg2, arg3, to_candid_UserRole_n10(this._uploadFile, this._downloadFile, arg4), arg5, arg6, arg7, arg8);
+                return from_candid_variant_n1(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.createUser(arg0, arg1, arg2, arg3, to_candid_UserRole_n10(this._uploadFile, this._downloadFile, arg4), arg5, arg6, arg7, arg8);
+            return from_candid_variant_n1(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async getAllDistricts(): Promise<Array<string>> {
         if (this.processError) {
             try {
                 const result = await this.actor.getAllDistricts();
@@ -298,200 +503,258 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async getAllLeads(): Promise<Array<Lead>> {
+    async getAllLeads(arg0: string): Promise<{
+        __kind__: "ok";
+        ok: Array<Lead>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.getAllLeads();
-                return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.getAllLeads(arg0);
+                return from_candid_variant_n12(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getAllLeads();
-            return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.getAllLeads(arg0);
+            return from_candid_variant_n12(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getAllUserProfiles(): Promise<Array<UserProfile>> {
+    async getAllUsers(arg0: string): Promise<{
+        __kind__: "ok";
+        ok: Array<UserProfile>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.getAllUserProfiles();
-                return from_candid_vec_n17(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.getAllUsers(arg0);
+                return from_candid_variant_n14(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getAllUserProfiles();
-            return from_candid_vec_n17(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async getCallerUserProfile(): Promise<UserProfile | null> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getCallerUserProfile();
-                return from_candid_opt_n22(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getCallerUserProfile();
-            return from_candid_opt_n22(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.getAllUsers(arg0);
+            return from_candid_variant_n14(this._uploadFile, this._downloadFile, result);
         }
     }
     async getCallerUserRole(): Promise<UserRole__1> {
         if (this.processError) {
             try {
                 const result = await this.actor.getCallerUserRole();
-                return from_candid_UserRole__1_n23(this._uploadFile, this._downloadFile, result);
+                return from_candid_UserRole__1_n20(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getCallerUserRole();
-            return from_candid_UserRole__1_n23(this._uploadFile, this._downloadFile, result);
+            return from_candid_UserRole__1_n20(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getLeadById(arg0: LeadId): Promise<Lead | null> {
+    async getLeadById(arg0: string, arg1: bigint): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.getLeadById(arg0);
-                return from_candid_opt_n25(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.getLeadById(arg0, arg1);
+                return from_candid_variant_n2(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getLeadById(arg0);
-            return from_candid_opt_n25(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.getLeadById(arg0, arg1);
+            return from_candid_variant_n2(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getLeadsAddedToday(): Promise<bigint> {
+    async getLeadsAddedToday(arg0: string): Promise<{
+        __kind__: "ok";
+        ok: bigint;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.getLeadsAddedToday();
-                return result;
+                const result = await this.actor.getLeadsAddedToday(arg0);
+                return from_candid_variant_n22(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getLeadsAddedToday();
-            return result;
+            const result = await this.actor.getLeadsAddedToday(arg0);
+            return from_candid_variant_n22(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getLeadsByDistrict(arg0: District): Promise<Array<Lead>> {
+    async getLeadsByDistrict(arg0: string, arg1: string): Promise<{
+        __kind__: "ok";
+        ok: Array<Lead>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.getLeadsByDistrict(arg0);
-                return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.getLeadsByDistrict(arg0, arg1);
+                return from_candid_variant_n12(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getLeadsByDistrict(arg0);
-            return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.getLeadsByDistrict(arg0, arg1);
+            return from_candid_variant_n12(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getLeadsByDistrictCount(): Promise<Array<[District, bigint]>> {
+    async getLeadsByDistrictCount(arg0: string): Promise<{
+        __kind__: "ok";
+        ok: Array<[string, bigint]>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.getLeadsByDistrictCount();
-                return result;
+                const result = await this.actor.getLeadsByDistrictCount(arg0);
+                return from_candid_variant_n23(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getLeadsByDistrictCount();
-            return result;
+            const result = await this.actor.getLeadsByDistrictCount(arg0);
+            return from_candid_variant_n23(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getLeadsBySalesPerson(arg0: UserId): Promise<Array<Lead>> {
+    async getLeadsByStage(arg0: string, arg1: PipelineStage): Promise<{
+        __kind__: "ok";
+        ok: Array<Lead>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.getLeadsBySalesPerson(arg0);
-                return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.getLeadsByStage(arg0, to_candid_PipelineStage_n24(this._uploadFile, this._downloadFile, arg1));
+                return from_candid_variant_n12(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getLeadsBySalesPerson(arg0);
-            return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.getLeadsByStage(arg0, to_candid_PipelineStage_n24(this._uploadFile, this._downloadFile, arg1));
+            return from_candid_variant_n12(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getLeadsByStage(arg0: PipelineStage): Promise<Array<Lead>> {
+    async getLeadsByStageCount(arg0: string): Promise<{
+        __kind__: "ok";
+        ok: Array<[PipelineStage, bigint]>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.getLeadsByStage(to_candid_PipelineStage_n3(this._uploadFile, this._downloadFile, arg0));
-                return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.getLeadsByStageCount(arg0);
+                return from_candid_variant_n26(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getLeadsByStage(to_candid_PipelineStage_n3(this._uploadFile, this._downloadFile, arg0));
-            return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.getLeadsByStageCount(arg0);
+            return from_candid_variant_n26(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getLeadsByStageCount(): Promise<Array<[PipelineStage, bigint]>> {
+    async getMyLeads(arg0: string): Promise<{
+        __kind__: "ok";
+        ok: Array<Lead>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.getLeadsByStageCount();
-                return from_candid_vec_n26(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.getMyLeads(arg0);
+                return from_candid_variant_n12(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getLeadsByStageCount();
-            return from_candid_vec_n26(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.getMyLeads(arg0);
+            return from_candid_variant_n12(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getMyLeads(): Promise<Array<Lead>> {
+    async getMyProfile(arg0: string): Promise<{
+        __kind__: "ok";
+        ok: UserProfile;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.getMyLeads();
-                return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.getMyProfile(arg0);
+                return from_candid_variant_n29(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getMyLeads();
-            return from_candid_vec_n11(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.getMyProfile(arg0);
+            return from_candid_variant_n29(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getTotalLeadsCount(): Promise<bigint> {
+    async getTotalLeadsCount(arg0: string): Promise<{
+        __kind__: "ok";
+        ok: bigint;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.getTotalLeadsCount();
-                return result;
+                const result = await this.actor.getTotalLeadsCount(arg0);
+                return from_candid_variant_n22(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getTotalLeadsCount();
-            return result;
+            const result = await this.actor.getTotalLeadsCount(arg0);
+            return from_candid_variant_n22(this._uploadFile, this._downloadFile, result);
         }
     }
-    async getUserProfile(arg0: Principal): Promise<UserProfile | null> {
+    async getUserById(arg0: string, arg1: string): Promise<{
+        __kind__: "ok";
+        ok: UserProfile;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.getUserProfile(arg0);
-                return from_candid_opt_n22(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.getUserById(arg0, arg1);
+                return from_candid_variant_n29(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.getUserProfile(arg0);
-            return from_candid_opt_n22(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.getUserById(arg0, arg1);
+            return from_candid_variant_n29(this._uploadFile, this._downloadFile, result);
         }
     }
     async isCallerAdmin(): Promise<boolean> {
@@ -508,179 +771,198 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async isCallerApproved(): Promise<boolean> {
+    async login(arg0: string, arg1: string): Promise<{
+        __kind__: "ok";
+        ok: string;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.isCallerApproved();
+                const result = await this.actor.login(arg0, arg1);
+                return from_candid_variant_n30(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.login(arg0, arg1);
+            return from_candid_variant_n30(this._uploadFile, this._downloadFile, result);
+        }
+    }
+    async logout(arg0: string): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.logout(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.isCallerApproved();
+            const result = await this.actor.logout(arg0);
             return result;
         }
     }
-    async listApprovals(): Promise<Array<UserApprovalInfo>> {
+    async updateLead(arg0: string, arg1: bigint, arg2: string, arg3: string, arg4: string, arg5: string, arg6: string, arg7: Requirement, arg8: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.listApprovals();
-                return from_candid_vec_n28(this._uploadFile, this._downloadFile, result);
+                const result = await this.actor.updateLead(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                return from_candid_variant_n2(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.listApprovals();
-            return from_candid_vec_n28(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.updateLead(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+            return from_candid_variant_n2(this._uploadFile, this._downloadFile, result);
         }
     }
-    async requestApproval(): Promise<void> {
+    async updateLeadStage(arg0: string, arg1: bigint, arg2: PipelineStage, arg3: string): Promise<{
+        __kind__: "ok";
+        ok: Lead;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.requestApproval();
-                return result;
+                const result = await this.actor.updateLeadStage(arg0, arg1, to_candid_PipelineStage_n24(this._uploadFile, this._downloadFile, arg2), arg3);
+                return from_candid_variant_n2(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.requestApproval();
-            return result;
+            const result = await this.actor.updateLeadStage(arg0, arg1, to_candid_PipelineStage_n24(this._uploadFile, this._downloadFile, arg2), arg3);
+            return from_candid_variant_n2(this._uploadFile, this._downloadFile, result);
         }
     }
-    async saveCallerUserProfile(arg0: UserProfile): Promise<void> {
+    async updateUser(arg0: string, arg1: string, arg2: string, arg3: string, arg4: string, arg5: string, arg6: string, arg7: boolean): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }> {
         if (this.processError) {
             try {
-                const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n5(this._uploadFile, this._downloadFile, arg0));
-                return result;
+                const result = await this.actor.updateUser(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+                return from_candid_variant_n1(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n5(this._uploadFile, this._downloadFile, arg0));
-            return result;
+            const result = await this.actor.updateUser(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7);
+            return from_candid_variant_n1(this._uploadFile, this._downloadFile, result);
         }
     }
-    async setApproval(arg0: Principal, arg1: ApprovalStatus): Promise<void> {
+    async validateSession(arg0: string): Promise<string | null> {
         if (this.processError) {
             try {
-                const result = await this.actor.setApproval(arg0, to_candid_ApprovalStatus_n33(this._uploadFile, this._downloadFile, arg1));
-                return result;
+                const result = await this.actor.validateSession(arg0);
+                return from_candid_opt_n7(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.setApproval(arg0, to_candid_ApprovalStatus_n33(this._uploadFile, this._downloadFile, arg1));
-            return result;
-        }
-    }
-    async updateLead(arg0: LeadId, arg1: Lead): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.updateLead(arg0, to_candid_Lead_n1(this._uploadFile, this._downloadFile, arg1));
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.updateLead(arg0, to_candid_Lead_n1(this._uploadFile, this._downloadFile, arg1));
-            return result;
-        }
-    }
-    async updateLeadStage(arg0: LeadId, arg1: PipelineStage, arg2: string): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.updateLeadStage(arg0, to_candid_PipelineStage_n3(this._uploadFile, this._downloadFile, arg1), arg2);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.updateLeadStage(arg0, to_candid_PipelineStage_n3(this._uploadFile, this._downloadFile, arg1), arg2);
-            return result;
-        }
-    }
-    async updateUserProfile(arg0: UserProfile): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.updateUserProfile(to_candid_UserProfile_n5(this._uploadFile, this._downloadFile, arg0));
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.updateUserProfile(to_candid_UserProfile_n5(this._uploadFile, this._downloadFile, arg0));
-            return result;
+            const result = await this.actor.validateSession(arg0);
+            return from_candid_opt_n7(this._uploadFile, this._downloadFile, result);
         }
     }
 }
-function from_candid_ApprovalStatus_n31(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _ApprovalStatus): ApprovalStatus {
-    return from_candid_variant_n32(_uploadFile, _downloadFile, value);
+function from_candid_Lead_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Lead): Lead {
+    return from_candid_record_n4(_uploadFile, _downloadFile, value);
 }
-function from_candid_Lead_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Lead): Lead {
-    return from_candid_record_n13(_uploadFile, _downloadFile, value);
+function from_candid_PipelineStage_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _PipelineStage): PipelineStage {
+    return from_candid_variant_n6(_uploadFile, _downloadFile, value);
 }
-function from_candid_PipelineStage_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _PipelineStage): PipelineStage {
-    return from_candid_variant_n15(_uploadFile, _downloadFile, value);
+function from_candid_UserProfile_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserProfile): UserProfile {
+    return from_candid_record_n17(_uploadFile, _downloadFile, value);
 }
-function from_candid_UserApprovalInfo_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserApprovalInfo): UserApprovalInfo {
-    return from_candid_record_n30(_uploadFile, _downloadFile, value);
-}
-function from_candid_UserProfile_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserProfile): UserProfile {
-    return from_candid_record_n19(_uploadFile, _downloadFile, value);
-}
-function from_candid_UserRole__1_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole__1): UserRole__1 {
-    return from_candid_variant_n24(_uploadFile, _downloadFile, value);
-}
-function from_candid_UserRole_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
+function from_candid_UserRole__1_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole__1): UserRole__1 {
     return from_candid_variant_n21(_uploadFile, _downloadFile, value);
 }
-function from_candid_opt_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_UserId]): UserId | null {
+function from_candid_UserRole_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
+    return from_candid_variant_n19(_uploadFile, _downloadFile, value);
+}
+function from_candid_opt_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_opt_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_UserProfile]): UserProfile | null {
-    return value.length === 0 ? null : from_candid_UserProfile_n18(_uploadFile, _downloadFile, value[0]);
+function from_candid_record_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    whatsAppNumber: string;
+    userId: string;
+    name: string;
+    role: _UserRole;
+    isActive: boolean;
+    email: string;
+    district: string;
+    passwordHash: string;
+    phone: string;
+}): {
+    whatsAppNumber: string;
+    userId: string;
+    name: string;
+    role: UserRole;
+    isActive: boolean;
+    email: string;
+    district: string;
+    passwordHash: string;
+    phone: string;
+} {
+    return {
+        whatsAppNumber: value.whatsAppNumber,
+        userId: value.userId,
+        name: value.name,
+        role: from_candid_UserRole_n18(_uploadFile, _downloadFile, value.role),
+        isActive: value.isActive,
+        email: value.email,
+        district: value.district,
+        passwordHash: value.passwordHash,
+        phone: value.phone
+    };
 }
-function from_candid_opt_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Lead]): Lead | null {
-    return value.length === 0 ? null : from_candid_Lead_n12(_uploadFile, _downloadFile, value[0]);
-}
-function from_candid_record_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    id: _LeadId;
+function from_candid_record_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    id: bigint;
     customerName: string;
     createdAt: _Time;
-    createdBy: _UserId;
+    createdBy: string;
     email: string;
-    district: _District;
+    district: string;
     updatedAt: _Time;
     stage: _PipelineStage;
-    assignedOperationsPerson: [] | [_UserId];
+    assignedOperationsPerson: [] | [string];
     address: string;
     notes: string;
     phone: string;
     requirements: _Requirement;
-    assignedSalesPerson: [] | [_UserId];
+    assignedSalesPerson: [] | [string];
+    remarks: Array<_Remark>;
 }): {
-    id: LeadId;
+    id: bigint;
     customerName: string;
     createdAt: Time;
-    createdBy: UserId;
+    createdBy: string;
     email: string;
-    district: District;
+    district: string;
     updatedAt: Time;
     stage: PipelineStage;
-    assignedOperationsPerson?: UserId;
+    assignedOperationsPerson?: string;
     address: string;
     notes: string;
     phone: string;
     requirements: Requirement;
-    assignedSalesPerson?: UserId;
+    assignedSalesPerson?: string;
+    remarks: Array<Remark>;
 } {
     return {
         id: value.id,
@@ -690,58 +972,214 @@ function from_candid_record_n13(_uploadFile: (file: ExternalBlob) => Promise<Uin
         email: value.email,
         district: value.district,
         updatedAt: value.updatedAt,
-        stage: from_candid_PipelineStage_n14(_uploadFile, _downloadFile, value.stage),
-        assignedOperationsPerson: record_opt_to_undefined(from_candid_opt_n16(_uploadFile, _downloadFile, value.assignedOperationsPerson)),
+        stage: from_candid_PipelineStage_n5(_uploadFile, _downloadFile, value.stage),
+        assignedOperationsPerson: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.assignedOperationsPerson)),
         address: value.address,
         notes: value.notes,
         phone: value.phone,
         requirements: value.requirements,
-        assignedSalesPerson: record_opt_to_undefined(from_candid_opt_n16(_uploadFile, _downloadFile, value.assignedSalesPerson))
+        assignedSalesPerson: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.assignedSalesPerson)),
+        remarks: value.remarks
     };
 }
-function from_candid_record_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    principal: _UserId;
-    name: string;
-    role: _UserRole;
-    email: string;
-    district: _District;
-    phone: string;
-}): {
-    principal: UserId;
-    name: string;
-    role: UserRole;
-    email: string;
-    district: District;
-    phone: string;
-} {
-    return {
-        principal: value.principal,
-        name: value.name,
-        role: from_candid_UserRole_n20(_uploadFile, _downloadFile, value.role),
-        email: value.email,
-        district: value.district,
-        phone: value.phone
-    };
-}
-function from_candid_record_n30(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    status: _ApprovalStatus;
-    principal: Principal;
-}): {
-    status: ApprovalStatus;
-    principal: Principal;
-} {
-    return {
-        status: from_candid_ApprovalStatus_n31(_uploadFile, _downloadFile, value.status),
-        principal: value.principal
-    };
-}
-function from_candid_tuple_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [_PipelineStage, bigint]): [PipelineStage, bigint] {
+function from_candid_tuple_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [_PipelineStage, bigint]): [PipelineStage, bigint] {
     return [
-        from_candid_PipelineStage_n14(_uploadFile, _downloadFile, value[0]),
+        from_candid_PipelineStage_n5(_uploadFile, _downloadFile, value[0]),
         value[1]
     ];
 }
-function from_candid_variant_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    ok: null;
+} | {
+    err: string;
+}): {
+    __kind__: "ok";
+    ok: null;
+} | {
+    __kind__: "err";
+    err: string;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: value.ok
+    } : "err" in value ? {
+        __kind__: "err",
+        err: value.err
+    } : value;
+}
+function from_candid_variant_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    ok: Array<_Lead>;
+} | {
+    err: string;
+}): {
+    __kind__: "ok";
+    ok: Array<Lead>;
+} | {
+    __kind__: "err";
+    err: string;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: from_candid_vec_n13(_uploadFile, _downloadFile, value.ok)
+    } : "err" in value ? {
+        __kind__: "err",
+        err: value.err
+    } : value;
+}
+function from_candid_variant_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    ok: Array<_UserProfile>;
+} | {
+    err: string;
+}): {
+    __kind__: "ok";
+    ok: Array<UserProfile>;
+} | {
+    __kind__: "err";
+    err: string;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: from_candid_vec_n15(_uploadFile, _downloadFile, value.ok)
+    } : "err" in value ? {
+        __kind__: "err",
+        err: value.err
+    } : value;
+}
+function from_candid_variant_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    admin: null;
+} | {
+    backoffice: null;
+} | {
+    sales: null;
+} | {
+    operation: null;
+}): UserRole {
+    return "admin" in value ? UserRole.admin : "backoffice" in value ? UserRole.backoffice : "sales" in value ? UserRole.sales : "operation" in value ? UserRole.operation : value;
+}
+function from_candid_variant_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    ok: _Lead;
+} | {
+    err: string;
+}): {
+    __kind__: "ok";
+    ok: Lead;
+} | {
+    __kind__: "err";
+    err: string;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: from_candid_Lead_n3(_uploadFile, _downloadFile, value.ok)
+    } : "err" in value ? {
+        __kind__: "err",
+        err: value.err
+    } : value;
+}
+function from_candid_variant_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    admin: null;
+} | {
+    user: null;
+} | {
+    guest: null;
+}): UserRole__1 {
+    return "admin" in value ? UserRole__1.admin : "user" in value ? UserRole__1.user : "guest" in value ? UserRole__1.guest : value;
+}
+function from_candid_variant_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    ok: bigint;
+} | {
+    err: string;
+}): {
+    __kind__: "ok";
+    ok: bigint;
+} | {
+    __kind__: "err";
+    err: string;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: value.ok
+    } : "err" in value ? {
+        __kind__: "err",
+        err: value.err
+    } : value;
+}
+function from_candid_variant_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    ok: Array<[string, bigint]>;
+} | {
+    err: string;
+}): {
+    __kind__: "ok";
+    ok: Array<[string, bigint]>;
+} | {
+    __kind__: "err";
+    err: string;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: value.ok
+    } : "err" in value ? {
+        __kind__: "err",
+        err: value.err
+    } : value;
+}
+function from_candid_variant_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    ok: Array<[_PipelineStage, bigint]>;
+} | {
+    err: string;
+}): {
+    __kind__: "ok";
+    ok: Array<[PipelineStage, bigint]>;
+} | {
+    __kind__: "err";
+    err: string;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: from_candid_vec_n27(_uploadFile, _downloadFile, value.ok)
+    } : "err" in value ? {
+        __kind__: "err",
+        err: value.err
+    } : value;
+}
+function from_candid_variant_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    ok: _UserProfile;
+} | {
+    err: string;
+}): {
+    __kind__: "ok";
+    ok: UserProfile;
+} | {
+    __kind__: "err";
+    err: string;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: from_candid_UserProfile_n16(_uploadFile, _downloadFile, value.ok)
+    } : "err" in value ? {
+        __kind__: "err",
+        err: value.err
+    } : value;
+}
+function from_candid_variant_n30(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    ok: string;
+} | {
+    err: string;
+}): {
+    __kind__: "ok";
+    ok: string;
+} | {
+    __kind__: "err";
+    err: string;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: value.ok
+    } : "err" in value ? {
+        __kind__: "err",
+        err: value.err
+    } : value;
+}
+function from_candid_variant_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     closedWon: null;
 } | {
     inquiry: null;
@@ -756,166 +1194,44 @@ function from_candid_variant_n15(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): PipelineStage {
     return "closedWon" in value ? PipelineStage.closedWon : "inquiry" in value ? PipelineStage.inquiry : "bookingConfirmed" in value ? PipelineStage.bookingConfirmed : "surveyScheduled" in value ? PipelineStage.surveyScheduled : "installation" in value ? PipelineStage.installation : "closedLost" in value ? PipelineStage.closedLost : value;
 }
-function from_candid_variant_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_vec_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Lead>): Array<Lead> {
+    return value.map((x)=>from_candid_Lead_n3(_uploadFile, _downloadFile, x));
+}
+function from_candid_vec_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_UserProfile>): Array<UserProfile> {
+    return value.map((x)=>from_candid_UserProfile_n16(_uploadFile, _downloadFile, x));
+}
+function from_candid_vec_n27(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<[_PipelineStage, bigint]>): Array<[PipelineStage, bigint]> {
+    return value.map((x)=>from_candid_tuple_n28(_uploadFile, _downloadFile, x));
+}
+function to_candid_PipelineStage_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: PipelineStage): _PipelineStage {
+    return to_candid_variant_n25(_uploadFile, _downloadFile, value);
+}
+function to_candid_UserRole__1_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole__1): _UserRole__1 {
+    return to_candid_variant_n9(_uploadFile, _downloadFile, value);
+}
+function to_candid_UserRole_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): _UserRole {
+    return to_candid_variant_n11(_uploadFile, _downloadFile, value);
+}
+function to_candid_variant_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): {
     admin: null;
+} | {
+    backoffice: null;
 } | {
     sales: null;
 } | {
-    operations: null;
-}): UserRole {
-    return "admin" in value ? UserRole.admin : "sales" in value ? UserRole.sales : "operations" in value ? UserRole.operations : value;
-}
-function from_candid_variant_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    admin: null;
-} | {
-    user: null;
-} | {
-    guest: null;
-}): UserRole__1 {
-    return "admin" in value ? UserRole__1.admin : "user" in value ? UserRole__1.user : "guest" in value ? UserRole__1.guest : value;
-}
-function from_candid_variant_n32(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    pending: null;
-} | {
-    approved: null;
-} | {
-    rejected: null;
-}): ApprovalStatus {
-    return "pending" in value ? ApprovalStatus.pending : "approved" in value ? ApprovalStatus.approved : "rejected" in value ? ApprovalStatus.rejected : value;
-}
-function from_candid_vec_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_Lead>): Array<Lead> {
-    return value.map((x)=>from_candid_Lead_n12(_uploadFile, _downloadFile, x));
-}
-function from_candid_vec_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_UserProfile>): Array<UserProfile> {
-    return value.map((x)=>from_candid_UserProfile_n18(_uploadFile, _downloadFile, x));
-}
-function from_candid_vec_n26(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<[_PipelineStage, bigint]>): Array<[PipelineStage, bigint]> {
-    return value.map((x)=>from_candid_tuple_n27(_uploadFile, _downloadFile, x));
-}
-function from_candid_vec_n28(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_UserApprovalInfo>): Array<UserApprovalInfo> {
-    return value.map((x)=>from_candid_UserApprovalInfo_n29(_uploadFile, _downloadFile, x));
-}
-function to_candid_ApprovalStatus_n33(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ApprovalStatus): _ApprovalStatus {
-    return to_candid_variant_n34(_uploadFile, _downloadFile, value);
-}
-function to_candid_Lead_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Lead): _Lead {
-    return to_candid_record_n2(_uploadFile, _downloadFile, value);
-}
-function to_candid_PipelineStage_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: PipelineStage): _PipelineStage {
-    return to_candid_variant_n4(_uploadFile, _downloadFile, value);
-}
-function to_candid_UserProfile_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserProfile): _UserProfile {
-    return to_candid_record_n6(_uploadFile, _downloadFile, value);
-}
-function to_candid_UserRole__1_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole__1): _UserRole__1 {
-    return to_candid_variant_n10(_uploadFile, _downloadFile, value);
-}
-function to_candid_UserRole_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): _UserRole {
-    return to_candid_variant_n8(_uploadFile, _downloadFile, value);
-}
-function to_candid_record_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    id: LeadId;
-    customerName: string;
-    createdAt: Time;
-    createdBy: UserId;
-    email: string;
-    district: District;
-    updatedAt: Time;
-    stage: PipelineStage;
-    assignedOperationsPerson?: UserId;
-    address: string;
-    notes: string;
-    phone: string;
-    requirements: Requirement;
-    assignedSalesPerson?: UserId;
-}): {
-    id: _LeadId;
-    customerName: string;
-    createdAt: _Time;
-    createdBy: _UserId;
-    email: string;
-    district: _District;
-    updatedAt: _Time;
-    stage: _PipelineStage;
-    assignedOperationsPerson: [] | [_UserId];
-    address: string;
-    notes: string;
-    phone: string;
-    requirements: _Requirement;
-    assignedSalesPerson: [] | [_UserId];
+    operation: null;
 } {
-    return {
-        id: value.id,
-        customerName: value.customerName,
-        createdAt: value.createdAt,
-        createdBy: value.createdBy,
-        email: value.email,
-        district: value.district,
-        updatedAt: value.updatedAt,
-        stage: to_candid_PipelineStage_n3(_uploadFile, _downloadFile, value.stage),
-        assignedOperationsPerson: value.assignedOperationsPerson ? candid_some(value.assignedOperationsPerson) : candid_none(),
-        address: value.address,
-        notes: value.notes,
-        phone: value.phone,
-        requirements: value.requirements,
-        assignedSalesPerson: value.assignedSalesPerson ? candid_some(value.assignedSalesPerson) : candid_none()
-    };
-}
-function to_candid_record_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    principal: UserId;
-    name: string;
-    role: UserRole;
-    email: string;
-    district: District;
-    phone: string;
-}): {
-    principal: _UserId;
-    name: string;
-    role: _UserRole;
-    email: string;
-    district: _District;
-    phone: string;
-} {
-    return {
-        principal: value.principal,
-        name: value.name,
-        role: to_candid_UserRole_n7(_uploadFile, _downloadFile, value.role),
-        email: value.email,
-        district: value.district,
-        phone: value.phone
-    };
-}
-function to_candid_variant_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole__1): {
-    admin: null;
-} | {
-    user: null;
-} | {
-    guest: null;
-} {
-    return value == UserRole__1.admin ? {
+    return value == UserRole.admin ? {
         admin: null
-    } : value == UserRole__1.user ? {
-        user: null
-    } : value == UserRole__1.guest ? {
-        guest: null
+    } : value == UserRole.backoffice ? {
+        backoffice: null
+    } : value == UserRole.sales ? {
+        sales: null
+    } : value == UserRole.operation ? {
+        operation: null
     } : value;
 }
-function to_candid_variant_n34(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: ApprovalStatus): {
-    pending: null;
-} | {
-    approved: null;
-} | {
-    rejected: null;
-} {
-    return value == ApprovalStatus.pending ? {
-        pending: null
-    } : value == ApprovalStatus.approved ? {
-        approved: null
-    } : value == ApprovalStatus.rejected ? {
-        rejected: null
-    } : value;
-}
-function to_candid_variant_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: PipelineStage): {
+function to_candid_variant_n25(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: PipelineStage): {
     closedWon: null;
 } | {
     inquiry: null;
@@ -942,19 +1258,19 @@ function to_candid_variant_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8
         closedLost: null
     } : value;
 }
-function to_candid_variant_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): {
+function to_candid_variant_n9(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole__1): {
     admin: null;
 } | {
-    sales: null;
+    user: null;
 } | {
-    operations: null;
+    guest: null;
 } {
-    return value == UserRole.admin ? {
+    return value == UserRole__1.admin ? {
         admin: null
-    } : value == UserRole.sales ? {
-        sales: null
-    } : value == UserRole.operations ? {
-        operations: null
+    } : value == UserRole__1.user ? {
+        user: null
+    } : value == UserRole__1.guest ? {
+        guest: null
     } : value;
 }
 export interface CreateActorOptions {

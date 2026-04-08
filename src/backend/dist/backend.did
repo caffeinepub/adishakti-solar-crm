@@ -7,23 +7,21 @@ type UserRole__1 =
 type UserRole = 
  variant {
    admin;
-   operations;
+   backoffice;
+   operation;
    sales;
  };
 type UserProfile = 
  record {
-   district: District;
+   district: text;
    email: text;
+   isActive: bool;
    name: text;
+   passwordHash: text;
    phone: text;
-   "principal": UserId;
    role: UserRole;
- };
-type UserId = principal;
-type UserApprovalInfo = 
- record {
-   "principal": principal;
-   status: ApprovalStatus;
+   userId: text;
+   whatsAppNumber: text;
  };
 type Time = int;
 type Requirement = 
@@ -32,6 +30,12 @@ type Requirement =
    notes: text;
    panelSize: text;
    systemType: text;
+ };
+type Remark = 
+ record {
+   addedAt: Time;
+   addedBy: text;
+   content: text;
  };
 type PipelineStage = 
  variant {
@@ -42,67 +46,153 @@ type PipelineStage =
    installation;
    surveyScheduled;
  };
-type LeadId = nat;
 type Lead = 
  record {
    address: text;
-   assignedOperationsPerson: opt UserId;
-   assignedSalesPerson: opt UserId;
+   assignedOperationsPerson: opt text;
+   assignedSalesPerson: opt text;
    createdAt: Time;
-   createdBy: UserId;
+   createdBy: text;
    customerName: text;
-   district: District;
+   district: text;
    email: text;
-   id: LeadId;
+   id: nat;
    notes: text;
    phone: text;
+   remarks: vec Remark;
    requirements: Requirement;
    stage: PipelineStage;
    updatedAt: Time;
  };
-type District = text;
-type ApprovalStatus = 
- variant {
-   approved;
-   pending;
-   rejected;
- };
 service : {
   _initializeAccessControl: () -> ();
-  addDistrict: (district: District) -> ();
-  addLead: (input: Lead) -> (LeadId);
-  addUserProfile: (profile: UserProfile) -> ();
+  addDistrict: (sessionToken: text, name: text) -> (variant {
+                                                      err: text;
+                                                      ok;
+                                                    });
+  addLead: (sessionToken: text, customerName: text, phone: text, email: 
+   text, address: text, district: text, requirements: Requirement, notes:
+   text) -> (variant {
+               err: text;
+               ok: Lead;
+             });
+  addRemark: (sessionToken: text, leadId: nat, content: text) ->
+   (variant {
+      err: text;
+      ok: Lead;
+    });
   assignCallerUserRole: (user: principal, role: UserRole__1) -> ();
-  assignLeadToOperations: (leadId: LeadId, operationsPerson: UserId) -> ();
-  assignLeadToSales: (leadId: LeadId, salesPerson: UserId) -> ();
-  getAllDistricts: () -> (vec District) query;
-  getAllLeads: () -> (vec Lead) query;
-  getAllUserProfiles: () -> (vec UserProfile) query;
-  getCallerUserProfile: () -> (opt UserProfile) query;
+  assignLeadToOperations: (sessionToken: text, leadId: nat, operationsUserId:
+   text) -> (variant {
+               err: text;
+               ok: Lead;
+             });
+  assignLeadToSales: (sessionToken: text, leadId: nat, salesUserId: text) ->
+   (variant {
+      err: text;
+      ok: Lead;
+    });
+  changePassword: (sessionToken: text, userId: text, newPassword: text) ->
+   (variant {
+      err: text;
+      ok;
+    });
+  createUser: (sessionToken: text, userId: text, password: text, name: 
+   text, role: UserRole, district: text, phone: text, email: text,
+   whatsAppNumber: text) -> (variant {
+                               err: text;
+                               ok;
+                             });
+  getAllDistricts: () -> (vec text) query;
+  getAllLeads: (sessionToken: text) ->
+   (variant {
+      err: text;
+      ok: vec Lead;
+    }) query;
+  getAllUsers: (sessionToken: text) ->
+   (variant {
+      err: text;
+      ok: vec UserProfile;
+    }) query;
   getCallerUserRole: () -> (UserRole__1) query;
-  getLeadById: (leadId: LeadId) -> (opt Lead) query;
-  getLeadsAddedToday: () -> (nat) query;
-  getLeadsByDistrict: (district: District) -> (vec Lead) query;
-  getLeadsByDistrictCount: () -> (vec record {
-                                        District;
-                                        nat;
-                                      }) query;
-  getLeadsBySalesPerson: (salesPerson: UserId) -> (vec Lead) query;
-  getLeadsByStage: (stage: PipelineStage) -> (vec Lead) query;
-  getLeadsByStageCount: () -> (vec record {
-                                     PipelineStage;
-                                     nat;
-                                   }) query;
-  getMyLeads: () -> (vec Lead) query;
-  getTotalLeadsCount: () -> (nat) query;
-  getUserProfile: (user: principal) -> (opt UserProfile) query;
+  getLeadById: (sessionToken: text, leadId: nat) ->
+   (variant {
+      err: text;
+      ok: Lead;
+    }) query;
+  getLeadsAddedToday: (sessionToken: text) ->
+   (variant {
+      err: text;
+      ok: nat;
+    }) query;
+  getLeadsByDistrict: (sessionToken: text, district: text) ->
+   (variant {
+      err: text;
+      ok: vec Lead;
+    }) query;
+  getLeadsByDistrictCount: (sessionToken: text) ->
+   (variant {
+      err: text;
+      ok: vec record {
+                text;
+                nat;
+              };
+    }) query;
+  getLeadsByStage: (sessionToken: text, stage: PipelineStage) ->
+   (variant {
+      err: text;
+      ok: vec Lead;
+    }) query;
+  getLeadsByStageCount: (sessionToken: text) ->
+   (variant {
+      err: text;
+      ok: vec record {
+                PipelineStage;
+                nat;
+              };
+    }) query;
+  getMyLeads: (sessionToken: text) ->
+   (variant {
+      err: text;
+      ok: vec Lead;
+    }) query;
+  getMyProfile: (sessionToken: text) ->
+   (variant {
+      err: text;
+      ok: UserProfile;
+    }) query;
+  getTotalLeadsCount: (sessionToken: text) ->
+   (variant {
+      err: text;
+      ok: nat;
+    }) query;
+  getUserById: (sessionToken: text, userId: text) ->
+   (variant {
+      err: text;
+      ok: UserProfile;
+    }) query;
   isCallerAdmin: () -> (bool) query;
-  isCallerApproved: () -> (bool) query;
-  listApprovals: () -> (vec UserApprovalInfo) query;
-  requestApproval: () -> ();
-  saveCallerUserProfile: (profile: UserProfile) -> ();
-  setApproval: (user: principal, status: ApprovalStatus) -> ();
-  updateLead: (leadId: LeadId, input: Lead) -> ();
-  updateLeadStage: (leadId: LeadId, stage: PipelineStage, notes: text) -> ();
-  updateUserProfile: (profile: UserProfile) -> ();
+  login: (username: text, password: text) -> (variant {
+                                                err: text;
+                                                ok: text;
+                                              });
+  logout: (sessionToken: text) -> ();
+  updateLead: (sessionToken: text, leadId: nat, customerName: text, phone:
+   text, email: text, address: text, district: text, requirements:
+   Requirement, notes: text) -> (variant {
+                                   err: text;
+                                   ok: Lead;
+                                 });
+  updateLeadStage: (sessionToken: text, leadId: nat, stage: PipelineStage,
+   notes: text) -> (variant {
+                      err: text;
+                      ok: Lead;
+                    });
+  updateUser: (sessionToken: text, userId: text, name: text, district: 
+   text, phone: text, email: text, whatsAppNumber: text, isActive: bool) ->
+   (variant {
+      err: text;
+      ok;
+    });
+  validateSession: (sessionToken: text) -> (opt text) query;
 }

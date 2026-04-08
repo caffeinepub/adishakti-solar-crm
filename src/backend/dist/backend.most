@@ -1,31 +1,41 @@
-// Version: 1.0.0
-type ApprovalStatus__575141016 = {#approved; #pending; #rejected};
+// Version: 3.0.0
+type AccessControlState__491533869 =
+  {
+    var adminAssigned : Bool;
+    userRoles : Map__605269027<Principal, UserRole__1054455867>
+  };
 type Data__791452850<K, V> =
   {var count : Nat__490723111; kvs : [var ?(K, V)]};
-type District__456344483 = Text;
 type Int__270357528 = Int__616954475;
 type Int__616954475 = Int;
 type Internal__8484328<K, V> =
   {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
-type LeadId__692235903 = Nat;
 type Lead__21276013 =
   {
     address : Text;
-    assignedOperationsPerson : ?UserId__313180070;
-    assignedSalesPerson : ?UserId__313180070;
+    assignedOperationsPerson : ?Text;
+    assignedSalesPerson : ?Text;
     createdAt : Time__900049286;
-    createdBy : UserId__313180070;
+    createdBy : Text;
     customerName : Text;
-    district : District__456344483;
+    district : Text;
     email : Text;
-    id : LeadId__692235903;
+    id : Nat;
     notes : Text;
     phone : Text;
+    remarks : [Remark__267946969];
     requirements : Requirement__404759958;
     stage : PipelineStage__644919044;
     updatedAt : Time__900049286
   };
 type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type List__415060402<T> = List__790383201<T>;
+type List__790383201<T> =
+  {
+    var blockIndex : Nat__490723111;
+    var blocks : [var [var ?T]];
+    var elementIndex : Nat__490723111
+  };
 type Map__158565046<K, V> = Map__297112838<K, V>;
 type Map__297112838<K, V> =
   {var root : Node__46230540<K, V>; var size : Nat__490723111};
@@ -34,6 +44,50 @@ type Nat__490723111 = Nat__920180692;
 type Nat__920180692 = Nat;
 type Node__46230540<K, V> =
   {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type OldApprovalState__567598485 =
+  {
+    var approvalStatus :
+      Map__605269027<Principal, OldApprovalStatus__248495692>
+  };
+type OldApprovalStatus__248495692 = {#approved; #pending; #rejected};
+type OldLead__546225271 =
+  {
+    address : Text;
+    assignedOperationsPerson : ?Principal;
+    assignedSalesPerson : ?Principal;
+    createdAt : Time__900049286;
+    createdBy : Principal;
+    customerName : Text;
+    district : Text;
+    email : Text;
+    id : Nat;
+    notes : Text;
+    phone : Text;
+    requirements : OldRequirement__214500848;
+    stage : OldPipelineStage__1050707698;
+    updatedAt : Time__900049286
+  };
+type OldPipelineStage__1050707698 =
+  {
+    #bookingConfirmed;
+    #closedLost;
+    #closedWon;
+    #inquiry;
+    #installation;
+    #surveyScheduled
+  };
+type OldRequirement__214500848 =
+  {estimatedValue : Nat; notes : Text; panelSize : Text; systemType : Text};
+type OldUserProfile__416069324 =
+  {
+    district : Text;
+    email : Text;
+    name : Text;
+    phone : Text;
+    principal : Principal;
+    role : OldUserRole__889293160
+  };
+type OldUserRole__889293160 = {#admin; #operations; #sales};
 type PipelineStage__644919044 =
   {
     #bookingConfirmed;
@@ -43,49 +97,93 @@ type PipelineStage__644919044 =
     #installation;
     #surveyScheduled
   };
+type Remark__267946969 =
+  {addedAt : Time__900049286; addedBy : Text; content : Text};
 type Requirement__404759958 =
   {estimatedValue : Nat; notes : Text; panelSize : Text; systemType : Text};
+type SessionData__547549588 = {createdAt : Time__900049286; userId : Text};
 type Time__796480547 = Int__270357528;
 type Time__900049286 = Time__796480547;
-type UserId__313180070 = Principal;
 type UserProfile__491224006 =
   {
-    district : District__456344483;
+    district : Text;
     email : Text;
+    isActive : Bool;
     name : Text;
+    passwordHash : Text;
     phone : Text;
-    principal : UserId__313180070;
-    role : UserRole__599675725
+    role : UserRole__599675725;
+    userId : Text;
+    whatsAppNumber : Text
   };
 type UserRole__1054455867 = {#admin; #guest; #user};
-type UserRole__599675725 = {#admin; #operations; #sales};
-actor {
+type UserRole__599675725 = {#admin; #backoffice; #operation; #sales};
+actor ({
+  in accessControlState : AccessControlState__491533869;
+  stable adminProfile :
+    {
+      district : Text;
+      email : Text;
+      isActive : Bool;
+      name : Text;
+      passwordHash : Text;
+      phone : Text;
+      role : UserRole__599675725;
+      userId : Text;
+      whatsAppNumber : Text
+    };
+  in approvalState : OldApprovalState__567598485;
+  in defaultDistricts : [Text];
+  in districts : List__415060402<Text>;
+  in leads : Map__605269027<Nat, OldLead__546225271>;
+  in var nextLeadId : Nat;
+  stable sessionTtlNanos : Int;
+  stable sessions :
+    {
+      var root : Node__46230540<Text, SessionData__547549588>;
+      var size : Nat__490723111
+    };
+  in userProfiles : Map__605269027<Principal, OldUserProfile__416069324>
+}, {
   stable accessControlState :
     {
       var adminAssigned : Bool;
       userRoles : Map__605269027<Principal, UserRole__1054455867>
     };
-  stable approvalState :
+  stable adminProfile :
     {
-      var approvalStatus :
-        Map__605269027<Principal, ApprovalStatus__575141016>
+      district : Text;
+      email : Text;
+      isActive : Bool;
+      name : Text;
+      passwordHash : Text;
+      phone : Text;
+      role : UserRole__599675725;
+      userId : Text;
+      whatsAppNumber : Text
     };
   stable defaultDistricts : [Text];
   stable districts :
     {
       var blockIndex : Nat__490723111;
-      var blocks : [var [var ?District__456344483]];
+      var blocks : [var [var ?Text]];
       var elementIndex : Nat__490723111
     };
   stable leads :
     {
-      var root : Node__46230540<LeadId__692235903, Lead__21276013>;
+      var root : Node__46230540<Nat, Lead__21276013>;
       var size : Nat__490723111
     };
   stable var nextLeadId : Nat;
-  stable userProfiles :
+  stable sessionTtlNanos : Int;
+  stable sessions :
     {
-      var root : Node__46230540<Principal, UserProfile__491224006>;
+      var root : Node__46230540<Text, SessionData__547549588>;
+      var size : Nat__490723111
+    };
+  stable users :
+    {
+      var root : Node__46230540<Text, UserProfile__491224006>;
       var size : Nat__490723111
     }
-};
+}) ;

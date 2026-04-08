@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
-import { useActor, useInternetIdentity } from "@caffeineai/core-infrastructure";
+import { useActor } from "@caffeineai/core-infrastructure";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   RouterProvider,
@@ -8,13 +9,8 @@ import {
   createRouter,
 } from "@tanstack/react-router";
 import { Sun } from "lucide-react";
-import { useEffect, useState } from "react";
 import { createActor } from "./backend";
-import {
-  useCallerProfile,
-  useIsAdmin,
-  useIsApproved,
-} from "./hooks/useQueries";
+import { useAuth } from "./hooks/useAuth";
 import Assignments from "./pages/Assignments";
 import Dashboard from "./pages/Dashboard";
 import Leads from "./pages/Leads";
@@ -23,7 +19,7 @@ import Pipeline from "./pages/Pipeline";
 import Reports from "./pages/Reports";
 import UsersPage from "./pages/Users";
 
-// ── Loading Screen ──────────────────────────────────────────────────────────────
+// ── Loading Screen ──────────────────────────────────────────────────────────
 
 function LoadingScreen() {
   return (
@@ -52,54 +48,19 @@ function LoadingScreen() {
   );
 }
 
-// ── Auth Gate ───────────────────────────────────────────────────────────────────
-// Key fix: only block on identity initialization + actor creation.
-// Profile / approval loading happens inside Login, not here.
+// ── Auth Gate ───────────────────────────────────────────────────────────────
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { identity, isInitializing } = useInternetIdentity();
   const { isFetching: actorLoading } = useActor(createActor);
+  const { sessionToken, profile, isLoading } = useAuth();
 
-  // Once we have an actor (anonymous or authenticated), fetch profile & admin
-  const { data: profile, isLoading: profileLoading } = useCallerProfile();
-  const { data: isAdmin, isLoading: adminLoading } = useIsAdmin();
-  const { data: isApproved, isLoading: approvedLoading } = useIsApproved();
-
-  // Timeout fallback: never stay in loading forever
-  const [timedOut, setTimedOut] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setTimedOut(true), 8000);
-    return () => clearTimeout(t);
-  }, []);
-
-  // Phase 1: Wait for identity system to initialize
-  if (isInitializing && !timedOut) {
-    return <LoadingScreen />;
-  }
-
-  // Phase 2: If not logged in, go straight to login (no need to wait for actor)
-  if (!identity) {
-    return <Login />;
-  }
-
-  // Phase 3: Identity exists — wait for actor + profile checks, but cap at timeout
-  const profileChecksLoading =
-    actorLoading || profileLoading || adminLoading || approvedLoading;
-  if (profileChecksLoading && !timedOut) {
-    return <LoadingScreen />;
-  }
-
-  // Phase 4: Profile missing → new user setup
-  // Phase 5: Not approved → pending screen
-  // Both handled in Login component
-  if (!profile || (!isAdmin && !isApproved)) {
-    return <Login />;
-  }
+  if (actorLoading || isLoading) return <LoadingScreen />;
+  if (!sessionToken || !profile) return <Login />;
 
   return <>{children}</>;
 }
 
-// ── Router setup ─────────────────────────────────────────────────────────────────
+// ── Router ──────────────────────────────────────────────────────────────────
 
 const rootRoute = createRootRoute({
   component: () => (
@@ -170,6 +131,12 @@ const usersRoute = createRoute({
   ),
 });
 
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/login",
+  component: Login,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   leadsRoute,
@@ -177,6 +144,7 @@ const routeTree = rootRoute.addChildren([
   assignmentsRoute,
   reportsRoute,
   usersRoute,
+  loginRoute,
 ]);
 
 const router = createRouter({ routeTree });
@@ -187,6 +155,12 @@ declare module "@tanstack/react-router" {
   }
 }
 
+const queryClient = new QueryClient();
+
 export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
 }

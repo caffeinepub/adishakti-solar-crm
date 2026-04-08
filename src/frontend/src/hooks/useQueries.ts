@@ -1,81 +1,89 @@
 import { useActor } from "@caffeineai/core-infrastructure";
-import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { District, Lead, UserApprovalInfo, UserProfile } from "../backend";
-import type { ApprovalStatus, PipelineStage } from "../backend";
+import type {
+  Lead,
+  PipelineStage,
+  Requirement,
+  UserProfile,
+  UserRole,
+} from "../backend";
 import { createActor } from "../backend";
+
+// ── Auth helpers ───────────────────────────────────────────────────────────
+
+function getToken(): string {
+  return localStorage.getItem("crm_session_token") ?? "";
+}
 
 // ── Leads ──────────────────────────────────────────────────────────────────
 
 export function useAllLeads() {
   const { actor, isFetching } = useActor(createActor);
+  const token = getToken();
   return useQuery<Lead[]>({
     queryKey: ["leads"],
     queryFn: async () => {
-      if (!actor) return [];
-      return actor.getAllLeads();
+      if (!actor || !token) return [];
+      const res = await actor.getAllLeads(token);
+      return res.__kind__ === "ok" ? res.ok : [];
     },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useLeadsByDistrict(district: District | null) {
-  const { actor, isFetching } = useActor(createActor);
-  return useQuery<Lead[]>({
-    queryKey: ["leads", "district", district],
-    queryFn: async () => {
-      if (!actor || !district) return [];
-      return actor.getLeadsByDistrict(district);
-    },
-    enabled: !!actor && !isFetching && !!district,
-  });
-}
-
-export function useTotalLeadsCount() {
-  const { actor, isFetching } = useActor(createActor);
-  return useQuery<bigint>({
-    queryKey: ["leads", "total"],
-    queryFn: async () => {
-      if (!actor) return BigInt(0);
-      return actor.getTotalLeadsCount();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useLeadsAddedToday() {
-  const { actor, isFetching } = useActor(createActor);
-  return useQuery<bigint>({
-    queryKey: ["leads", "today"],
-    queryFn: async () => {
-      if (!actor) return BigInt(0);
-      return actor.getLeadsAddedToday();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useLeadsByStageCount() {
-  const { actor, isFetching } = useActor(createActor);
-  return useQuery<Array<[PipelineStage, bigint]>>({
-    queryKey: ["leads", "stageCount"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.getLeadsByStageCount();
-    },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor && !isFetching && !!token,
   });
 }
 
 export function useMyLeads() {
   const { actor, isFetching } = useActor(createActor);
+  const token = getToken();
   return useQuery<Lead[]>({
     queryKey: ["leads", "mine"],
     queryFn: async () => {
-      if (!actor) return [];
-      return actor.getMyLeads();
+      if (!actor || !token) return [];
+      const res = await actor.getMyLeads(token);
+      return res.__kind__ === "ok" ? res.ok : [];
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor && !isFetching && !!token,
+  });
+}
+
+export function useTotalLeadsCount() {
+  const { actor, isFetching } = useActor(createActor);
+  const token = getToken();
+  return useQuery<bigint>({
+    queryKey: ["leads", "total"],
+    queryFn: async () => {
+      if (!actor || !token) return BigInt(0);
+      const res = await actor.getTotalLeadsCount(token);
+      return res.__kind__ === "ok" ? res.ok : BigInt(0);
+    },
+    enabled: !!actor && !isFetching && !!token,
+  });
+}
+
+export function useLeadsAddedToday() {
+  const { actor, isFetching } = useActor(createActor);
+  const token = getToken();
+  return useQuery<bigint>({
+    queryKey: ["leads", "today"],
+    queryFn: async () => {
+      if (!actor || !token) return BigInt(0);
+      const res = await actor.getLeadsAddedToday(token);
+      return res.__kind__ === "ok" ? res.ok : BigInt(0);
+    },
+    enabled: !!actor && !isFetching && !!token,
+  });
+}
+
+export function useLeadsByStageCount() {
+  const { actor, isFetching } = useActor(createActor);
+  const token = getToken();
+  return useQuery<Array<[PipelineStage, bigint]>>({
+    queryKey: ["leads", "stageCount"],
+    queryFn: async () => {
+      if (!actor || !token) return [];
+      const res = await actor.getLeadsByStageCount(token);
+      return res.__kind__ === "ok" ? res.ok : [];
+    },
+    enabled: !!actor && !isFetching && !!token,
   });
 }
 
@@ -85,9 +93,29 @@ export function useAddLead() {
   const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (lead: Lead) => {
+    mutationFn: async (params: {
+      customerName: string;
+      phone: string;
+      email: string;
+      address: string;
+      district: string;
+      requirements: Requirement;
+      notes: string;
+    }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.addLead(lead);
+      const token = getToken();
+      const res = await actor.addLead(
+        token,
+        params.customerName,
+        params.phone,
+        params.email,
+        params.address,
+        params.district,
+        params.requirements,
+        params.notes,
+      );
+      if (res.__kind__ === "err") throw new Error(res.err);
+      return res.ok;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["leads"] });
@@ -99,9 +127,31 @@ export function useUpdateLead() {
   const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, lead }: { id: bigint; lead: Lead }) => {
+    mutationFn: async (params: {
+      leadId: bigint;
+      customerName: string;
+      phone: string;
+      email: string;
+      address: string;
+      district: string;
+      requirements: Requirement;
+      notes: string;
+    }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.updateLead(id, lead);
+      const token = getToken();
+      const res = await actor.updateLead(
+        token,
+        params.leadId,
+        params.customerName,
+        params.phone,
+        params.email,
+        params.address,
+        params.district,
+        params.requirements,
+        params.notes,
+      );
+      if (res.__kind__ === "err") throw new Error(res.err);
+      return res.ok;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["leads"] });
@@ -113,13 +163,21 @@ export function useUpdateLeadStage() {
   const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      id,
-      stage,
-      notes,
-    }: { id: bigint; stage: PipelineStage; notes: string }) => {
+    mutationFn: async (params: {
+      id: bigint;
+      stage: PipelineStage;
+      notes: string;
+    }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.updateLeadStage(id, stage, notes);
+      const token = getToken();
+      const res = await actor.updateLeadStage(
+        token,
+        params.id,
+        params.stage,
+        params.notes,
+      );
+      if (res.__kind__ === "err") throw new Error(res.err);
+      return res.ok;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["leads"] });
@@ -131,12 +189,16 @@ export function useAssignLeadToSales() {
   const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      leadId,
-      salesPerson,
-    }: { leadId: bigint; salesPerson: Principal }) => {
+    mutationFn: async (params: { leadId: bigint; salesUserId: string }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.assignLeadToSales(leadId, salesPerson);
+      const token = getToken();
+      const res = await actor.assignLeadToSales(
+        token,
+        params.leadId,
+        params.salesUserId,
+      );
+      if (res.__kind__ === "err") throw new Error(res.err);
+      return res.ok;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["leads"] });
@@ -148,12 +210,36 @@ export function useAssignLeadToOperations() {
   const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({
-      leadId,
-      opsPerson,
-    }: { leadId: bigint; opsPerson: Principal }) => {
+    mutationFn: async (params: {
+      leadId: bigint;
+      operationsUserId: string;
+    }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.assignLeadToOperations(leadId, opsPerson);
+      const token = getToken();
+      const res = await actor.assignLeadToOperations(
+        token,
+        params.leadId,
+        params.operationsUserId,
+      );
+      if (res.__kind__ === "err") throw new Error(res.err);
+      return res.ok;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leads"] });
+    },
+  });
+}
+
+export function useAddRemark() {
+  const { actor } = useActor(createActor);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { leadId: bigint; content: string }) => {
+      if (!actor) throw new Error("Not connected");
+      const token = getToken();
+      const res = await actor.addRemark(token, params.leadId, params.content);
+      if (res.__kind__ === "err") throw new Error(res.err);
+      return res.ok;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["leads"] });
@@ -165,7 +251,7 @@ export function useAssignLeadToOperations() {
 
 export function useAllDistricts() {
   const { actor, isFetching } = useActor(createActor);
-  return useQuery<District[]>({
+  return useQuery<string[]>({
     queryKey: ["districts"],
     queryFn: async () => {
       if (!actor) return [];
@@ -179,9 +265,11 @@ export function useAddDistrict() {
   const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (district: string) => {
+    mutationFn: async (name: string) => {
       if (!actor) throw new Error("Not connected");
-      return actor.addDistrict(district);
+      const token = getToken();
+      const res = await actor.addDistrict(token, name);
+      if (res.__kind__ === "err") throw new Error(res.err);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["districts"] });
@@ -193,137 +281,98 @@ export function useAddDistrict() {
 
 export function useAllUsers() {
   const { actor, isFetching } = useActor(createActor);
+  const token = getToken();
   return useQuery<UserProfile[]>({
     queryKey: ["users"],
     queryFn: async () => {
-      if (!actor) return [];
-      return actor.getAllUserProfiles();
+      if (!actor || !token) return [];
+      const res = await actor.getAllUsers(token);
+      return res.__kind__ === "ok" ? res.ok : [];
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor && !isFetching && !!token,
   });
 }
 
-export function useCallerProfile() {
-  const { actor, isFetching } = useActor(createActor);
-  return useQuery<UserProfile | null>({
-    queryKey: ["callerProfile"],
-    queryFn: async () => {
-      if (!actor) return null;
-      return actor.getCallerUserProfile();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useIsAdmin() {
-  const { actor, isFetching } = useActor(createActor);
-  return useQuery<boolean>({
-    queryKey: ["isAdmin"],
-    queryFn: async () => {
-      if (!actor) return false;
-      return actor.isCallerAdmin();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useIsApproved() {
-  const { actor, isFetching } = useActor(createActor);
-  return useQuery<boolean>({
-    queryKey: ["isApproved"],
-    queryFn: async () => {
-      if (!actor) return false;
-      return actor.isCallerApproved();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useListApprovals() {
-  const { actor, isFetching } = useActor(createActor);
-  return useQuery<UserApprovalInfo[]>({
-    queryKey: ["approvals"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.listApprovals();
-    },
-    enabled: !!actor && !isFetching,
-  });
-}
-
-export function useAddUserProfile() {
+export function useCreateUser() {
   const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (profile: UserProfile) => {
+    mutationFn: async (params: {
+      userId: string;
+      password: string;
+      name: string;
+      role: UserRole;
+      district: string;
+      phone: string;
+      email: string;
+      whatsAppNumber: string;
+    }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.addUserProfile(profile);
+      const token = getToken();
+      const res = await actor.createUser(
+        token,
+        params.userId,
+        params.password,
+        params.name,
+        params.role,
+        params.district,
+        params.phone,
+        params.email,
+        params.whatsAppNumber,
+      );
+      if (res.__kind__ === "err") throw new Error(res.err);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["callerProfile"] });
       qc.invalidateQueries({ queryKey: ["users"] });
     },
   });
 }
 
-export function useUpdateUserProfile() {
+export function useUpdateUser() {
   const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (profile: UserProfile) => {
+    mutationFn: async (params: {
+      userId: string;
+      name: string;
+      district: string;
+      phone: string;
+      email: string;
+      whatsAppNumber: string;
+      isActive: boolean;
+    }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.updateUserProfile(profile);
+      const token = getToken();
+      const res = await actor.updateUser(
+        token,
+        params.userId,
+        params.name,
+        params.district,
+        params.phone,
+        params.email,
+        params.whatsAppNumber,
+        params.isActive,
+      );
+      if (res.__kind__ === "err") throw new Error(res.err);
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["callerProfile"] });
       qc.invalidateQueries({ queryKey: ["users"] });
     },
   });
 }
 
-export function useRequestApproval() {
+export function useChangePassword() {
   const { actor } = useActor(createActor);
-  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
+    mutationFn: async (params: { userId: string; newPassword: string }) => {
       if (!actor) throw new Error("Not connected");
-      return actor.requestApproval();
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["isApproved"] });
-      qc.invalidateQueries({ queryKey: ["approvals"] });
-    },
-  });
-}
-
-export function useSetApproval() {
-  const { actor } = useActor(createActor);
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      user,
-      status,
-    }: { user: Principal; status: ApprovalStatus }) => {
-      if (!actor) throw new Error("Not connected");
-      return actor.setApproval(user, status);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["approvals"] });
-      qc.invalidateQueries({ queryKey: ["users"] });
-    },
-  });
-}
-
-export function useSeedDistricts() {
-  const { actor } = useActor(createActor);
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (districts: string[]) => {
-      if (!actor) throw new Error("Not connected");
-      await Promise.all(districts.map((d) => actor.addDistrict(d)));
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["districts"] });
+      const token = getToken();
+      const res = await actor.changePassword(
+        token,
+        params.userId,
+        params.newPassword,
+      );
+      if (res.__kind__ === "err") throw new Error(res.err);
     },
   });
 }

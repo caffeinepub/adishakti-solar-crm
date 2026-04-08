@@ -11,11 +11,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Edit2, Eye, Filter, Search, UserPlus, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { Lead } from "../backend";
-import { PipelineStage, UserRole } from "../backend";
+import { UserRole } from "../backend";
 import { Layout } from "../components/Layout";
 import { LeadModal } from "../components/LeadModal";
 import { StageBadge } from "../components/StageBadge";
 import { StageModal } from "../components/StageModal";
+import { useAuth } from "../hooks/useAuth";
 import {
   useAddLead,
   useAllDistricts,
@@ -38,6 +39,7 @@ export default function Leads() {
   const [addLeadOpen, setAddLeadOpen] = useState(false);
   const [editLead, setEditLead] = useState<Lead | null>(null);
   const [stageLead, setStageLead] = useState<Lead | null>(null);
+  const { userId } = useAuth();
 
   const { data: allLeads = [], isLoading } = useAllLeads();
   const { data: districts = [] } = useAllDistricts();
@@ -84,12 +86,11 @@ export default function Leads() {
             </p>
           </div>
           <Button
-            className="bg-gold text-navy-800 hover:bg-gold-dark font-semibold"
+            className="bg-gold text-[#0A1220] hover:bg-gold/90 font-semibold"
             onClick={() => setAddLeadOpen(true)}
             data-ocid="leads.add_lead.button"
           >
-            <UserPlus className="w-4 h-4 mr-2" />
-            Add Lead
+            <UserPlus className="w-4 h-4 mr-2" /> Add Lead
           </Button>
         </div>
       </div>
@@ -144,7 +145,7 @@ export default function Leads() {
             <p className="text-muted-foreground">No leads found.</p>
             <Button
               size="sm"
-              className="mt-3 bg-gold text-navy-800 hover:bg-gold-dark"
+              className="mt-3 bg-gold text-[#0A1220] hover:bg-gold/90"
               onClick={() => setAddLeadOpen(true)}
             >
               Add Lead
@@ -178,9 +179,7 @@ export default function Leads() {
               <tbody>
                 {filtered.map((lead, i) => {
                   const sp = users.find(
-                    (u) =>
-                      u.principal.toString() ===
-                      lead.assignedSalesPerson?.toString(),
+                    (u) => u.userId === lead.assignedSalesPerson,
                   );
                   return (
                     <tr
@@ -252,11 +251,12 @@ export default function Leads() {
         editLead={editLead}
         districts={districts}
         salesUsers={salesUsers}
-        onSubmit={async (lead) => {
+        currentUserId={userId ?? ""}
+        onSubmit={async (params) => {
           if (editLead) {
-            await updateLead.mutateAsync({ id: editLead.id, lead });
+            await updateLead.mutateAsync({ leadId: editLead.id, ...params });
           } else {
-            await addLead.mutateAsync(lead);
+            await addLead.mutateAsync(params);
           }
         }}
       />

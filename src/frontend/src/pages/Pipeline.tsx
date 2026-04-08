@@ -1,11 +1,12 @@
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import type { Lead } from "../backend";
-import { PipelineStage, UserRole } from "../backend";
+import { UserRole } from "../backend";
 import { Layout } from "../components/Layout";
 import { LeadCard } from "../components/LeadCard";
 import { LeadModal } from "../components/LeadModal";
 import { StageModal } from "../components/StageModal";
+import { useAuth } from "../hooks/useAuth";
 import {
   useAddLead,
   useAllDistricts,
@@ -14,13 +15,19 @@ import {
   useUpdateLead,
   useUpdateLeadStage,
 } from "../hooks/useQueries";
-import { PIPELINE_STAGES, STAGE_COLORS, STAGE_LABELS } from "../types";
+import {
+  PIPELINE_STAGES,
+  PipelineStage,
+  STAGE_COLORS,
+  STAGE_LABELS,
+} from "../types";
 
 export default function Pipeline() {
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
   const [editLead, setEditLead] = useState<Lead | null>(null);
   const [stageLead, setStageLead] = useState<Lead | null>(null);
   const [addLeadOpen, setAddLeadOpen] = useState(false);
+  const { userId } = useAuth();
 
   const { data: allLeads = [] } = useAllLeads();
   const { data: districts = [] } = useAllDistricts();
@@ -134,11 +141,12 @@ export default function Pipeline() {
         editLead={editLead}
         districts={districts}
         salesUsers={salesUsers}
-        onSubmit={async (lead) => {
+        currentUserId={userId ?? ""}
+        onSubmit={async (params) => {
           if (editLead) {
-            await updateLead.mutateAsync({ id: editLead.id, lead });
+            await updateLead.mutateAsync({ leadId: editLead.id, ...params });
           } else {
-            await addLead.mutateAsync(lead);
+            await addLead.mutateAsync(params);
           }
         }}
       />

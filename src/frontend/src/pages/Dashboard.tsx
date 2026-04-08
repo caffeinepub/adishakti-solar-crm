@@ -11,6 +11,7 @@ import { LeadCard } from "../components/LeadCard";
 import { LeadModal } from "../components/LeadModal";
 import { StageBadge } from "../components/StageBadge";
 import { StageModal } from "../components/StageModal";
+import { useAuth } from "../hooks/useAuth";
 import {
   useAddLead,
   useAllDistricts,
@@ -34,6 +35,7 @@ export default function Dashboard() {
   const [editLead, setEditLead] = useState<Lead | null>(null);
   const [stageLead, setStageLead] = useState<Lead | null>(null);
   const navigate = useNavigate();
+  const { userId } = useAuth();
 
   const { data: allLeads = [], isLoading: leadsLoading } = useAllLeads();
   const { data: totalCount, isLoading: totalLoading } = useTotalLeadsCount();
@@ -82,13 +84,12 @@ export default function Dashboard() {
       onScheduleSurvey={() => navigate({ to: "/pipeline" })}
       onAssignLeads={() => navigate({ to: "/assignments" })}
     >
-      {/* Page Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight text-foreground uppercase">
           Solar Sales CRM Dashboard
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Dashboard Overview — Welcome to Shree Adishakti Solar Pvt Ltd CRM
+          Welcome to Shree Adishakti Solar Pvt Ltd CRM — Odisha Operations
         </p>
       </div>
 
@@ -216,7 +217,7 @@ export default function Dashboard() {
               </p>
               <Button
                 size="sm"
-                className="mt-3 bg-gold text-navy-800 hover:bg-gold-dark"
+                className="mt-3 bg-gold text-[#0A1220] hover:bg-gold/90"
                 onClick={() => setAddLeadOpen(true)}
                 data-ocid="leads.add_first.button"
               >
@@ -298,13 +299,12 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Footer */}
       <footer className="mt-8 pt-4 border-t border-border">
         <div className="grid grid-cols-2 gap-4 text-xs text-muted-foreground mb-3">
           <div>
             <p className="font-semibold text-foreground mb-1">Company Info</p>
             <p>Shree Adishakti Solar Pvt Ltd</p>
-            <p>Gujarat, India</p>
+            <p>Odisha, India</p>
           </div>
           <div>
             <p className="font-semibold text-foreground mb-1">Quick Links</p>
@@ -330,7 +330,6 @@ export default function Dashboard() {
         </p>
       </footer>
 
-      {/* Modals */}
       <LeadModal
         open={addLeadOpen || !!editLead}
         onClose={() => {
@@ -340,11 +339,12 @@ export default function Dashboard() {
         editLead={editLead}
         districts={districts}
         salesUsers={salesUsers}
-        onSubmit={async (lead) => {
+        currentUserId={userId ?? ""}
+        onSubmit={async (params) => {
           if (editLead) {
-            await updateLead.mutateAsync({ id: editLead.id, lead });
+            await updateLead.mutateAsync({ leadId: editLead.id, ...params });
           } else {
-            await addLead.mutateAsync(lead);
+            await addLead.mutateAsync(params);
           }
         }}
       />

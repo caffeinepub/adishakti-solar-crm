@@ -8,10 +8,13 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
-export const District = IDL.Text;
-export const LeadId = IDL.Nat;
+export const Requirement = IDL.Record({
+  'panelSize' : IDL.Text,
+  'notes' : IDL.Text,
+  'estimatedValue' : IDL.Nat,
+  'systemType' : IDL.Text,
+});
 export const Time = IDL.Int;
-export const UserId = IDL.Principal;
 export const PipelineStage = IDL.Variant({
   'closedWon' : IDL.Null,
   'inquiry' : IDL.Null,
@@ -20,109 +23,234 @@ export const PipelineStage = IDL.Variant({
   'installation' : IDL.Null,
   'closedLost' : IDL.Null,
 });
-export const Requirement = IDL.Record({
-  'panelSize' : IDL.Text,
-  'notes' : IDL.Text,
-  'estimatedValue' : IDL.Nat,
-  'systemType' : IDL.Text,
+export const Remark = IDL.Record({
+  'content' : IDL.Text,
+  'addedAt' : Time,
+  'addedBy' : IDL.Text,
 });
 export const Lead = IDL.Record({
-  'id' : LeadId,
+  'id' : IDL.Nat,
   'customerName' : IDL.Text,
   'createdAt' : Time,
-  'createdBy' : UserId,
+  'createdBy' : IDL.Text,
   'email' : IDL.Text,
-  'district' : District,
+  'district' : IDL.Text,
   'updatedAt' : Time,
   'stage' : PipelineStage,
-  'assignedOperationsPerson' : IDL.Opt(UserId),
+  'assignedOperationsPerson' : IDL.Opt(IDL.Text),
   'address' : IDL.Text,
   'notes' : IDL.Text,
   'phone' : IDL.Text,
   'requirements' : Requirement,
-  'assignedSalesPerson' : IDL.Opt(UserId),
-});
-export const UserRole = IDL.Variant({
-  'admin' : IDL.Null,
-  'sales' : IDL.Null,
-  'operations' : IDL.Null,
-});
-export const UserProfile = IDL.Record({
-  'principal' : UserId,
-  'name' : IDL.Text,
-  'role' : UserRole,
-  'email' : IDL.Text,
-  'district' : District,
-  'phone' : IDL.Text,
+  'assignedSalesPerson' : IDL.Opt(IDL.Text),
+  'remarks' : IDL.Vec(Remark),
 });
 export const UserRole__1 = IDL.Variant({
   'admin' : IDL.Null,
   'user' : IDL.Null,
   'guest' : IDL.Null,
 });
-export const ApprovalStatus = IDL.Variant({
-  'pending' : IDL.Null,
-  'approved' : IDL.Null,
-  'rejected' : IDL.Null,
+export const UserRole = IDL.Variant({
+  'admin' : IDL.Null,
+  'backoffice' : IDL.Null,
+  'sales' : IDL.Null,
+  'operation' : IDL.Null,
 });
-export const UserApprovalInfo = IDL.Record({
-  'status' : ApprovalStatus,
-  'principal' : IDL.Principal,
+export const UserProfile = IDL.Record({
+  'whatsAppNumber' : IDL.Text,
+  'userId' : IDL.Text,
+  'name' : IDL.Text,
+  'role' : UserRole,
+  'isActive' : IDL.Bool,
+  'email' : IDL.Text,
+  'district' : IDL.Text,
+  'passwordHash' : IDL.Text,
+  'phone' : IDL.Text,
 });
 
 export const idlService = IDL.Service({
   '_initializeAccessControl' : IDL.Func([], [], []),
-  'addDistrict' : IDL.Func([District], [], []),
-  'addLead' : IDL.Func([Lead], [LeadId], []),
-  'addUserProfile' : IDL.Func([UserProfile], [], []),
+  'addDistrict' : IDL.Func(
+      [IDL.Text, IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
+  'addLead' : IDL.Func(
+      [
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        Requirement,
+        IDL.Text,
+      ],
+      [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+      [],
+    ),
+  'addRemark' : IDL.Func(
+      [IDL.Text, IDL.Nat, IDL.Text],
+      [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+      [],
+    ),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole__1], [], []),
-  'assignLeadToOperations' : IDL.Func([LeadId, UserId], [], []),
-  'assignLeadToSales' : IDL.Func([LeadId, UserId], [], []),
-  'getAllDistricts' : IDL.Func([], [IDL.Vec(District)], ['query']),
-  'getAllLeads' : IDL.Func([], [IDL.Vec(Lead)], ['query']),
-  'getAllUserProfiles' : IDL.Func([], [IDL.Vec(UserProfile)], ['query']),
-  'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
+  'assignLeadToOperations' : IDL.Func(
+      [IDL.Text, IDL.Nat, IDL.Text],
+      [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+      [],
+    ),
+  'assignLeadToSales' : IDL.Func(
+      [IDL.Text, IDL.Nat, IDL.Text],
+      [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+      [],
+    ),
+  'changePassword' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
+  'createUser' : IDL.Func(
+      [
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        UserRole,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+      ],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
+  'getAllDistricts' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+  'getAllLeads' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Vec(Lead), 'err' : IDL.Text })],
+      ['query'],
+    ),
+  'getAllUsers' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Vec(UserProfile), 'err' : IDL.Text })],
+      ['query'],
+    ),
   'getCallerUserRole' : IDL.Func([], [UserRole__1], ['query']),
-  'getLeadById' : IDL.Func([LeadId], [IDL.Opt(Lead)], ['query']),
-  'getLeadsAddedToday' : IDL.Func([], [IDL.Nat], ['query']),
-  'getLeadsByDistrict' : IDL.Func([District], [IDL.Vec(Lead)], ['query']),
+  'getLeadById' : IDL.Func(
+      [IDL.Text, IDL.Nat],
+      [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+      ['query'],
+    ),
+  'getLeadsAddedToday' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
+      ['query'],
+    ),
+  'getLeadsByDistrict' : IDL.Func(
+      [IDL.Text, IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Vec(Lead), 'err' : IDL.Text })],
+      ['query'],
+    ),
   'getLeadsByDistrictCount' : IDL.Func(
-      [],
-      [IDL.Vec(IDL.Tuple(District, IDL.Nat))],
+      [IDL.Text],
+      [
+        IDL.Variant({
+          'ok' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat)),
+          'err' : IDL.Text,
+        }),
+      ],
       ['query'],
     ),
-  'getLeadsBySalesPerson' : IDL.Func([UserId], [IDL.Vec(Lead)], ['query']),
-  'getLeadsByStage' : IDL.Func([PipelineStage], [IDL.Vec(Lead)], ['query']),
+  'getLeadsByStage' : IDL.Func(
+      [IDL.Text, PipelineStage],
+      [IDL.Variant({ 'ok' : IDL.Vec(Lead), 'err' : IDL.Text })],
+      ['query'],
+    ),
   'getLeadsByStageCount' : IDL.Func(
-      [],
-      [IDL.Vec(IDL.Tuple(PipelineStage, IDL.Nat))],
+      [IDL.Text],
+      [
+        IDL.Variant({
+          'ok' : IDL.Vec(IDL.Tuple(PipelineStage, IDL.Nat)),
+          'err' : IDL.Text,
+        }),
+      ],
       ['query'],
     ),
-  'getMyLeads' : IDL.Func([], [IDL.Vec(Lead)], ['query']),
-  'getTotalLeadsCount' : IDL.Func([], [IDL.Nat], ['query']),
-  'getUserProfile' : IDL.Func(
-      [IDL.Principal],
-      [IDL.Opt(UserProfile)],
+  'getMyLeads' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Vec(Lead), 'err' : IDL.Text })],
+      ['query'],
+    ),
+  'getMyProfile' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : UserProfile, 'err' : IDL.Text })],
+      ['query'],
+    ),
+  'getTotalLeadsCount' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
+      ['query'],
+    ),
+  'getUserById' : IDL.Func(
+      [IDL.Text, IDL.Text],
+      [IDL.Variant({ 'ok' : UserProfile, 'err' : IDL.Text })],
       ['query'],
     ),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-  'isCallerApproved' : IDL.Func([], [IDL.Bool], ['query']),
-  'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
-  'requestApproval' : IDL.Func([], [], []),
-  'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-  'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
-  'updateLead' : IDL.Func([LeadId, Lead], [], []),
-  'updateLeadStage' : IDL.Func([LeadId, PipelineStage, IDL.Text], [], []),
-  'updateUserProfile' : IDL.Func([UserProfile], [], []),
+  'login' : IDL.Func(
+      [IDL.Text, IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
+  'logout' : IDL.Func([IDL.Text], [], []),
+  'updateLead' : IDL.Func(
+      [
+        IDL.Text,
+        IDL.Nat,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        Requirement,
+        IDL.Text,
+      ],
+      [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+      [],
+    ),
+  'updateLeadStage' : IDL.Func(
+      [IDL.Text, IDL.Nat, PipelineStage, IDL.Text],
+      [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+      [],
+    ),
+  'updateUser' : IDL.Func(
+      [
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Text,
+        IDL.Bool,
+      ],
+      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+      [],
+    ),
+  'validateSession' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
 });
 
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
-  const District = IDL.Text;
-  const LeadId = IDL.Nat;
+  const Requirement = IDL.Record({
+    'panelSize' : IDL.Text,
+    'notes' : IDL.Text,
+    'estimatedValue' : IDL.Nat,
+    'systemType' : IDL.Text,
+  });
   const Time = IDL.Int;
-  const UserId = IDL.Principal;
   const PipelineStage = IDL.Variant({
     'closedWon' : IDL.Null,
     'inquiry' : IDL.Null,
@@ -131,100 +259,222 @@ export const idlFactory = ({ IDL }) => {
     'installation' : IDL.Null,
     'closedLost' : IDL.Null,
   });
-  const Requirement = IDL.Record({
-    'panelSize' : IDL.Text,
-    'notes' : IDL.Text,
-    'estimatedValue' : IDL.Nat,
-    'systemType' : IDL.Text,
+  const Remark = IDL.Record({
+    'content' : IDL.Text,
+    'addedAt' : Time,
+    'addedBy' : IDL.Text,
   });
   const Lead = IDL.Record({
-    'id' : LeadId,
+    'id' : IDL.Nat,
     'customerName' : IDL.Text,
     'createdAt' : Time,
-    'createdBy' : UserId,
+    'createdBy' : IDL.Text,
     'email' : IDL.Text,
-    'district' : District,
+    'district' : IDL.Text,
     'updatedAt' : Time,
     'stage' : PipelineStage,
-    'assignedOperationsPerson' : IDL.Opt(UserId),
+    'assignedOperationsPerson' : IDL.Opt(IDL.Text),
     'address' : IDL.Text,
     'notes' : IDL.Text,
     'phone' : IDL.Text,
     'requirements' : Requirement,
-    'assignedSalesPerson' : IDL.Opt(UserId),
-  });
-  const UserRole = IDL.Variant({
-    'admin' : IDL.Null,
-    'sales' : IDL.Null,
-    'operations' : IDL.Null,
-  });
-  const UserProfile = IDL.Record({
-    'principal' : UserId,
-    'name' : IDL.Text,
-    'role' : UserRole,
-    'email' : IDL.Text,
-    'district' : District,
-    'phone' : IDL.Text,
+    'assignedSalesPerson' : IDL.Opt(IDL.Text),
+    'remarks' : IDL.Vec(Remark),
   });
   const UserRole__1 = IDL.Variant({
     'admin' : IDL.Null,
     'user' : IDL.Null,
     'guest' : IDL.Null,
   });
-  const ApprovalStatus = IDL.Variant({
-    'pending' : IDL.Null,
-    'approved' : IDL.Null,
-    'rejected' : IDL.Null,
+  const UserRole = IDL.Variant({
+    'admin' : IDL.Null,
+    'backoffice' : IDL.Null,
+    'sales' : IDL.Null,
+    'operation' : IDL.Null,
   });
-  const UserApprovalInfo = IDL.Record({
-    'status' : ApprovalStatus,
-    'principal' : IDL.Principal,
+  const UserProfile = IDL.Record({
+    'whatsAppNumber' : IDL.Text,
+    'userId' : IDL.Text,
+    'name' : IDL.Text,
+    'role' : UserRole,
+    'isActive' : IDL.Bool,
+    'email' : IDL.Text,
+    'district' : IDL.Text,
+    'passwordHash' : IDL.Text,
+    'phone' : IDL.Text,
   });
   
   return IDL.Service({
     '_initializeAccessControl' : IDL.Func([], [], []),
-    'addDistrict' : IDL.Func([District], [], []),
-    'addLead' : IDL.Func([Lead], [LeadId], []),
-    'addUserProfile' : IDL.Func([UserProfile], [], []),
+    'addDistrict' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
+    'addLead' : IDL.Func(
+        [
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          Requirement,
+          IDL.Text,
+        ],
+        [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+        [],
+      ),
+    'addRemark' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Text],
+        [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+        [],
+      ),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole__1], [], []),
-    'assignLeadToOperations' : IDL.Func([LeadId, UserId], [], []),
-    'assignLeadToSales' : IDL.Func([LeadId, UserId], [], []),
-    'getAllDistricts' : IDL.Func([], [IDL.Vec(District)], ['query']),
-    'getAllLeads' : IDL.Func([], [IDL.Vec(Lead)], ['query']),
-    'getAllUserProfiles' : IDL.Func([], [IDL.Vec(UserProfile)], ['query']),
-    'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
+    'assignLeadToOperations' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Text],
+        [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+        [],
+      ),
+    'assignLeadToSales' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Text],
+        [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+        [],
+      ),
+    'changePassword' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
+    'createUser' : IDL.Func(
+        [
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          UserRole,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+        ],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
+    'getAllDistricts' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+    'getAllLeads' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Vec(Lead), 'err' : IDL.Text })],
+        ['query'],
+      ),
+    'getAllUsers' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Vec(UserProfile), 'err' : IDL.Text })],
+        ['query'],
+      ),
     'getCallerUserRole' : IDL.Func([], [UserRole__1], ['query']),
-    'getLeadById' : IDL.Func([LeadId], [IDL.Opt(Lead)], ['query']),
-    'getLeadsAddedToday' : IDL.Func([], [IDL.Nat], ['query']),
-    'getLeadsByDistrict' : IDL.Func([District], [IDL.Vec(Lead)], ['query']),
+    'getLeadById' : IDL.Func(
+        [IDL.Text, IDL.Nat],
+        [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+        ['query'],
+      ),
+    'getLeadsAddedToday' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
+        ['query'],
+      ),
+    'getLeadsByDistrict' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Vec(Lead), 'err' : IDL.Text })],
+        ['query'],
+      ),
     'getLeadsByDistrictCount' : IDL.Func(
-        [],
-        [IDL.Vec(IDL.Tuple(District, IDL.Nat))],
+        [IDL.Text],
+        [
+          IDL.Variant({
+            'ok' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat)),
+            'err' : IDL.Text,
+          }),
+        ],
         ['query'],
       ),
-    'getLeadsBySalesPerson' : IDL.Func([UserId], [IDL.Vec(Lead)], ['query']),
-    'getLeadsByStage' : IDL.Func([PipelineStage], [IDL.Vec(Lead)], ['query']),
+    'getLeadsByStage' : IDL.Func(
+        [IDL.Text, PipelineStage],
+        [IDL.Variant({ 'ok' : IDL.Vec(Lead), 'err' : IDL.Text })],
+        ['query'],
+      ),
     'getLeadsByStageCount' : IDL.Func(
-        [],
-        [IDL.Vec(IDL.Tuple(PipelineStage, IDL.Nat))],
+        [IDL.Text],
+        [
+          IDL.Variant({
+            'ok' : IDL.Vec(IDL.Tuple(PipelineStage, IDL.Nat)),
+            'err' : IDL.Text,
+          }),
+        ],
         ['query'],
       ),
-    'getMyLeads' : IDL.Func([], [IDL.Vec(Lead)], ['query']),
-    'getTotalLeadsCount' : IDL.Func([], [IDL.Nat], ['query']),
-    'getUserProfile' : IDL.Func(
-        [IDL.Principal],
-        [IDL.Opt(UserProfile)],
+    'getMyLeads' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Vec(Lead), 'err' : IDL.Text })],
+        ['query'],
+      ),
+    'getMyProfile' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : UserProfile, 'err' : IDL.Text })],
+        ['query'],
+      ),
+    'getTotalLeadsCount' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
+        ['query'],
+      ),
+    'getUserById' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : UserProfile, 'err' : IDL.Text })],
         ['query'],
       ),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-    'isCallerApproved' : IDL.Func([], [IDL.Bool], ['query']),
-    'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
-    'requestApproval' : IDL.Func([], [], []),
-    'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
-    'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
-    'updateLead' : IDL.Func([LeadId, Lead], [], []),
-    'updateLeadStage' : IDL.Func([LeadId, PipelineStage, IDL.Text], [], []),
-    'updateUserProfile' : IDL.Func([UserProfile], [], []),
+    'login' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
+    'logout' : IDL.Func([IDL.Text], [], []),
+    'updateLead' : IDL.Func(
+        [
+          IDL.Text,
+          IDL.Nat,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          Requirement,
+          IDL.Text,
+        ],
+        [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+        [],
+      ),
+    'updateLeadStage' : IDL.Func(
+        [IDL.Text, IDL.Nat, PipelineStage, IDL.Text],
+        [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+        [],
+      ),
+    'updateUser' : IDL.Func(
+        [
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Text,
+          IDL.Bool,
+        ],
+        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
+        [],
+      ),
+    'validateSession' : IDL.Func([IDL.Text], [IDL.Opt(IDL.Text)], ['query']),
   });
 };
 

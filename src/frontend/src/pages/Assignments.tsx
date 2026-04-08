@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -8,10 +9,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { Lead } from "../backend";
 import { UserRole } from "../backend";
 import { Layout } from "../components/Layout";
 import { StageBadge } from "../components/StageBadge";
+import { useAuth } from "../hooks/useAuth";
 import {
   useAllDistricts,
   useAllLeads,
@@ -19,10 +20,11 @@ import {
   useAssignLeadToOperations,
   useAssignLeadToSales,
 } from "../hooks/useQueries";
-import { formatCurrency, formatDate } from "../types";
+import { canAssignLeads, formatCurrency, formatDate } from "../types";
 
 export default function Assignments() {
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
+  const { userRole } = useAuth();
 
   const { data: allLeads = [], isLoading } = useAllLeads();
   const { data: users = [] } = useAllUsers();
@@ -30,36 +32,43 @@ export default function Assignments() {
   const assignOps = useAssignLeadToOperations();
 
   const salesUsers = users.filter((u) => u.role === UserRole.sales);
-  const opsUsers = users.filter((u) => u.role === UserRole.operations);
+  const opsUsers = users.filter((u) => u.role === UserRole.operation);
+
+  const canAssign = userRole ? canAssignLeads(userRole) : false;
 
   const filteredLeads = selectedDistrict
     ? allLeads.filter((l) => l.district === selectedDistrict)
     : allLeads;
 
-  const handleAssignSales = async (leadId: bigint, principalStr: string) => {
-    if (principalStr === "__none__") return;
-    const user = salesUsers.find(
-      (u) => u.principal.toString() === principalStr,
-    );
-    if (!user) return;
+  const handleAssignSales = async (leadId: bigint, userId: string) => {
+    if (userId === "__none__") return;
     try {
-      await assignSales.mutateAsync({ leadId, salesPerson: user.principal });
+      await assignSales.mutateAsync({ leadId, salesUserId: userId });
       toast.success("Sales person assigned!");
-    } catch (err: any) {
-      toast.error(err?.message ?? "Failed to assign.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to assign.";
+      toast.error(msg);
     }
   };
 
-  const handleAssignOps = async (leadId: bigint, principalStr: string) => {
-    if (principalStr === "__none__") return;
-    const user = opsUsers.find((u) => u.principal.toString() === principalStr);
-    if (!user) return;
+  const handleAssignOps = async (leadId: bigint, userId: string) => {
+    if (userId === "__none__") return;
     try {
-      await assignOps.mutateAsync({ leadId, opsPerson: user.principal });
+      await assignOps.mutateAsync({ leadId, operationsUserId: userId });
       toast.success("Operations person assigned!");
-    } catch (err: any) {
-      toast.error(err?.message ?? "Failed to assign.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to assign.";
+      toast.error(msg);
     }
+  };
+
+  const buildWhatsAppLink = (
+    lead: (typeof allLeads)[number],
+    salesUser: (typeof salesUsers)[number],
+  ) => {
+    const msg = `Lead Details: ${lead.customerName}, Phone: ${lead.phone}, District: ${lead.district}, Requirements: ${lead.requirements.systemType}, ${lead.requirements.panelSize}kW, Est. Value: ₹${lead.requirements.estimatedValue}`;
+    const phone = salesUser.whatsAppNumber.replace(/\D/g, "");
+    return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
   };
 
   return (
@@ -73,7 +82,9 @@ export default function Assignments() {
           Assignments
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Assign leads to sales & operations team members by district
+          {canAssign
+            ? "Assign leads to sales & operations team members by district"
+            : "View lead assignments"}
         </p>
       </div>
 
@@ -105,6 +116,7 @@ export default function Assignments() {
                     "Stage",
                     "Value",
                     "Sales Person",
+                    "WhatsApp",
                     "Operations",
                     "Added",
                   ].map((h) => (
@@ -120,14 +132,10 @@ export default function Assignments() {
               <tbody>
                 {filteredLeads.map((lead, i) => {
                   const currentSales = salesUsers.find(
-                    (u) =>
-                      u.principal.toString() ===
-                      lead.assignedSalesPerson?.toString(),
+                    (u) => u.userId === lead.assignedSalesPerson,
                   );
                   const currentOps = opsUsers.find(
-                    (u) =>
-                      u.principal.toString() ===
-                      lead.assignedOperationsPerson?.toString(),
+                    (u) => u.userId === lead.assignedOperationsPerson,
                   );
 
                   return (
@@ -136,10 +144,10 @@ export default function Assignments() {
                       className="border-b border-border/50 hover:bg-muted/20"
                       data-ocid={`assignments.item.${i + 1}`}
                     >
-                      <td className="px-3 py-2 font-medium text-foreground">
+                      <td className="px-3 py-2 font-medium text-foreground max-w-[120px] truncate">
                         {lead.customerName}
                       </td>
-                      <td className="px-3 py-2 text-muted-foreground">
+                      <td className="px-3 py-2 text-muted-foreground text-xs">
                         {lead.district}
                       </td>
                       <td className="px-3 py-2">
@@ -149,66 +157,93 @@ export default function Assignments() {
                         {formatCurrency(lead.requirements.estimatedValue)}
                       </td>
                       <td className="px-3 py-2">
-                        <Select
-                          value={
-                            currentSales?.principal.toString() ?? "__none__"
-                          }
-                          onValueChange={(v) => handleAssignSales(lead.id, v)}
-                        >
-                          <SelectTrigger
-                            className="w-36 h-8 text-xs bg-muted border-border text-foreground"
-                            data-ocid={`assignments.sales.select.${i + 1}`}
+                        {canAssign ? (
+                          <Select
+                            value={currentSales?.userId ?? "__none__"}
+                            onValueChange={(v) => handleAssignSales(lead.id, v)}
                           >
-                            <SelectValue placeholder="Assign sales" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-popover border-border">
-                            <SelectItem
-                              value="__none__"
-                              className="text-muted-foreground text-xs"
+                            <SelectTrigger
+                              className="w-36 h-8 text-xs bg-muted border-border text-foreground"
+                              data-ocid={`assignments.sales.select.${i + 1}`}
                             >
-                              Unassigned
-                            </SelectItem>
-                            {salesUsers.map((u) => (
+                              <SelectValue placeholder="Assign sales" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-popover border-border">
                               <SelectItem
-                                key={u.principal.toString()}
-                                value={u.principal.toString()}
-                                className="text-xs text-foreground"
+                                value="__none__"
+                                className="text-muted-foreground text-xs"
                               >
-                                {u.name}
+                                Unassigned
                               </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                              {salesUsers.map((u) => (
+                                <SelectItem
+                                  key={u.userId}
+                                  value={u.userId}
+                                  className="text-xs text-foreground"
+                                >
+                                  {u.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            {currentSales?.name ?? "—"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2">
-                        <Select
-                          value={currentOps?.principal.toString() ?? "__none__"}
-                          onValueChange={(v) => handleAssignOps(lead.id, v)}
-                        >
-                          <SelectTrigger
-                            className="w-36 h-8 text-xs bg-muted border-border text-foreground"
-                            data-ocid={`assignments.ops.select.${i + 1}`}
+                        {currentSales?.whatsAppNumber ? (
+                          <a
+                            href={buildWhatsAppLink(lead, currentSales)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[10px] bg-green-900/40 text-green-300 border border-green-700/50 rounded px-2 py-1 font-semibold hover:bg-green-900/60 transition-colors"
+                            data-ocid={`assignments.whatsapp.${i + 1}`}
                           >
-                            <SelectValue placeholder="Assign ops" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-popover border-border">
-                            <SelectItem
-                              value="__none__"
-                              className="text-muted-foreground text-xs"
+                            <span>📱</span> WhatsApp
+                          </a>
+                        ) : (
+                          <span className="text-[10px] text-muted-foreground/40">
+                            —
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        {canAssign ? (
+                          <Select
+                            value={currentOps?.userId ?? "__none__"}
+                            onValueChange={(v) => handleAssignOps(lead.id, v)}
+                          >
+                            <SelectTrigger
+                              className="w-36 h-8 text-xs bg-muted border-border text-foreground"
+                              data-ocid={`assignments.ops.select.${i + 1}`}
                             >
-                              Unassigned
-                            </SelectItem>
-                            {opsUsers.map((u) => (
+                              <SelectValue placeholder="Assign ops" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-popover border-border">
                               <SelectItem
-                                key={u.principal.toString()}
-                                value={u.principal.toString()}
-                                className="text-xs text-foreground"
+                                value="__none__"
+                                className="text-muted-foreground text-xs"
                               >
-                                {u.name}
+                                Unassigned
                               </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                              {opsUsers.map((u) => (
+                                <SelectItem
+                                  key={u.userId}
+                                  value={u.userId}
+                                  className="text-xs text-foreground"
+                                >
+                                  {u.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            {currentOps?.name ?? "—"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2 text-muted-foreground text-xs">
                         {formatDate(lead.createdAt)}

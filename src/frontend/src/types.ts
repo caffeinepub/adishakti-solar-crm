@@ -1,8 +1,5 @@
-import type { Principal } from "@icp-sdk/core/principal";
-import { ApprovalStatus, PipelineStage, UserRole } from "./backend";
-
-export type { Principal };
-export { PipelineStage, UserRole, ApprovalStatus };
+import { PipelineStage, UserRole } from "./backend";
+export { PipelineStage, UserRole };
 
 export const PIPELINE_STAGES = [
   PipelineStage.inquiry,
@@ -60,8 +57,18 @@ export const STAGE_COLORS: Record<
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.admin]: "Admin",
+  [UserRole.backoffice]: "Backoffice",
   [UserRole.sales]: "Sales",
-  [UserRole.operations]: "Operations",
+  [UserRole.operation]: "Operation",
+};
+
+export const ROLE_COLORS: Record<UserRole, string> = {
+  [UserRole.admin]: "bg-gold/20 text-gold border-gold/30",
+  [UserRole.backoffice]:
+    "bg-purple-900/40 text-purple-300 border-purple-700/50",
+  [UserRole.sales]: "bg-blue-900/40 text-blue-300 border-blue-700/50",
+  [UserRole.operation]:
+    "bg-emerald-900/40 text-emerald-300 border-emerald-700/50",
 };
 
 export const DEFAULT_DISTRICTS = [
@@ -97,6 +104,26 @@ export const DEFAULT_DISTRICTS = [
   "Sundargarh",
 ];
 
+export function getRoleName(role: UserRole): string {
+  return ROLE_LABELS[role] ?? "Unknown";
+}
+
+export function isAdmin(role: UserRole): boolean {
+  return role === UserRole.admin;
+}
+
+export function isBackoffice(role: UserRole): boolean {
+  return role === UserRole.backoffice;
+}
+
+export function isSales(role: UserRole): boolean {
+  return role === UserRole.sales;
+}
+
+export function canAssignLeads(role: UserRole): boolean {
+  return role === UserRole.admin || role === UserRole.backoffice;
+}
+
 export function formatDate(timestamp: bigint): string {
   const ms = Number(timestamp / BigInt(1_000_000));
   const d = new Date(ms);
@@ -106,16 +133,21 @@ export function formatDate(timestamp: bigint): string {
   return `${dd}/${mm}/${yyyy}`;
 }
 
+export function formatDateTime(timestamp: bigint): string {
+  const ms = Number(timestamp / BigInt(1_000_000));
+  const d = new Date(ms);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
+}
+
 export function formatCurrency(value: bigint): string {
   const num = Number(value);
   if (num >= 10_000_000) return `₹${(num / 10_000_000).toFixed(1)}Cr`;
   if (num >= 100_000) return `₹${(num / 100_000).toFixed(1)}L`;
   if (num >= 1_000) return `₹${(num / 1_000).toFixed(0)}K`;
   return `₹${num}`;
-}
-
-export function truncatePrincipal(p: Principal): string {
-  const s = p.toString();
-  if (s.length <= 12) return s;
-  return `${s.slice(0, 6)}...${s.slice(-4)}`;
 }

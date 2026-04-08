@@ -8,11 +8,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { useInternetIdentity } from "@caffeineai/core-infrastructure";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   BarChart2,
-  Bell,
   CalendarCheck,
   ChevronDown,
   ClipboardList,
@@ -21,7 +19,6 @@ import {
   LogOut,
   MapPin,
   Menu,
-  Settings,
   UserCheck,
   UserPlus,
   Users,
@@ -29,12 +26,9 @@ import {
   Zap,
 } from "lucide-react";
 import { useState } from "react";
-import {
-  useAllDistricts,
-  useCallerProfile,
-  useIsAdmin,
-} from "../hooks/useQueries";
-import { DEFAULT_DISTRICTS, ROLE_LABELS } from "../types";
+import { useAuth } from "../hooks/useAuth";
+import { useAllDistricts } from "../hooks/useQueries";
+import { DEFAULT_DISTRICTS, ROLE_LABELS, UserRole, isAdmin } from "../types";
 
 const NAV_ITEMS = [
   { label: "Dashboard", to: "/" as const, icon: LayoutDashboard },
@@ -64,12 +58,11 @@ export function Layout({
   onScheduleSurvey,
   onAssignLeads,
 }: LayoutProps) {
-  const { clear } = useInternetIdentity();
-  const { data: profile } = useCallerProfile();
-  const { data: isAdmin } = useIsAdmin();
+  const { profile, userRole, logout } = useAuth();
   const { data: districts = [] } = useAllDistricts();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
+  const adminUser = userRole ? isAdmin(userRole) : false;
 
   const allDistricts = districts.length > 0 ? districts : DEFAULT_DISTRICTS;
 
@@ -82,9 +75,9 @@ export function Layout({
         .slice(0, 2)
     : "?";
 
-  const handleLogout = () => {
-    clear();
-    navigate({ to: "/" });
+  const handleLogout = async () => {
+    await logout();
+    navigate({ to: "/login" });
   };
 
   return (
@@ -104,7 +97,7 @@ export function Layout({
             type="button"
             className="md:hidden text-muted-foreground mr-1"
             onClick={() => setSidebarOpen((v) => !v)}
-            onKeyDown={(e) => e.key === "Enter" && setSidebarOpen((v) => !v)}
+            aria-label="Toggle navigation"
             data-ocid="nav.toggle"
           >
             {sidebarOpen ? (
@@ -124,7 +117,7 @@ export function Layout({
         </div>
 
         <nav className="hidden md:flex items-center gap-1 flex-1">
-          {NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map(
+          {NAV_ITEMS.filter((item) => !item.adminOnly || adminUser).map(
             (item) => (
               <Link
                 key={item.to}
@@ -146,13 +139,6 @@ export function Layout({
         </nav>
 
         <div className="flex items-center gap-2 ml-auto">
-          <button
-            type="button"
-            className="text-muted-foreground hover:text-foreground p-1.5 rounded"
-            data-ocid="nav.bell.button"
-          >
-            <Bell className="w-4 h-4" />
-          </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -167,10 +153,10 @@ export function Layout({
                 </Avatar>
                 <div className="hidden md:flex flex-col items-start">
                   <span className="text-xs font-semibold text-foreground">
-                    {profile?.name ?? "User"}
+                    {profile?.name ?? profile?.userId ?? "User"}
                   </span>
                   <span className="text-[10px] text-muted-foreground">
-                    {profile ? ROLE_LABELS[profile.role] : ""}
+                    {userRole ? ROLE_LABELS[userRole] : ""}
                   </span>
                 </div>
                 <ChevronDown className="w-3 h-3 text-muted-foreground" />
@@ -180,15 +166,17 @@ export function Layout({
               align="end"
               className="bg-popover border-border w-44"
             >
-              <DropdownMenuItem
-                className="text-xs text-foreground hover:bg-muted"
-                data-ocid="nav.settings.button"
-              >
-                <Settings className="w-3.5 h-3.5 mr-2" /> Settings
-              </DropdownMenuItem>
+              <div className="px-2 py-1.5 border-b border-border mb-1">
+                <p className="text-xs font-semibold text-foreground">
+                  {profile?.userId}
+                </p>
+                <p className="text-[10px] text-muted-foreground">
+                  {userRole ? ROLE_LABELS[userRole] : ""}
+                </p>
+              </div>
               <DropdownMenuSeparator className="bg-border" />
               <DropdownMenuItem
-                className="text-xs text-destructive hover:bg-muted"
+                className="text-xs text-destructive hover:bg-muted cursor-pointer"
                 onClick={handleLogout}
                 data-ocid="nav.logout.button"
               >
@@ -215,7 +203,7 @@ export function Layout({
           <ScrollArea className="flex-1 py-3">
             {/* Mobile nav */}
             <nav className="md:hidden flex flex-col gap-0.5 px-2 mb-4">
-              {NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin).map(
+              {NAV_ITEMS.filter((item) => !item.adminOnly || adminUser).map(
                 (item) => (
                   <Link
                     key={item.to}
@@ -241,7 +229,6 @@ export function Layout({
               <button
                 type="button"
                 onClick={() => onDistrictChange?.(null)}
-                onKeyDown={(e) => e.key === "Enter" && onDistrictChange?.(null)}
                 className={cn(
                   "w-full text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 transition-colors mb-0.5",
                   !selectedDistrict
@@ -257,7 +244,6 @@ export function Layout({
                   key={d}
                   type="button"
                   onClick={() => onDistrictChange?.(d)}
-                  onKeyDown={(e) => e.key === "Enter" && onDistrictChange?.(d)}
                   className={cn(
                     "w-full text-left px-2 py-1.5 rounded text-xs flex items-center gap-2 transition-colors mb-0.5",
                     selectedDistrict === d
@@ -286,7 +272,6 @@ export function Layout({
             className="hidden xl:flex fixed right-0 top-14 bottom-0 w-80 flex-col gap-3 p-4 overflow-y-auto border-l"
             style={{ background: "#0D192B", borderColor: "#26364A" }}
           >
-            {/* Quick Actions */}
             <div className="bg-card rounded-lg border border-border p-3">
               <p className="text-xs font-bold text-gold uppercase tracking-widest mb-3">
                 Quick Actions
@@ -295,7 +280,6 @@ export function Layout({
                 <button
                   type="button"
                   onClick={onAddLead}
-                  onKeyDown={(e) => e.key === "Enter" && onAddLead?.()}
                   className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 transition-colors w-full text-left"
                   data-ocid="quick.add_lead.button"
                 >
@@ -314,7 +298,6 @@ export function Layout({
                 <button
                   type="button"
                   onClick={onScheduleSurvey}
-                  onKeyDown={(e) => e.key === "Enter" && onScheduleSurvey?.()}
                   className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 transition-colors w-full text-left"
                   data-ocid="quick.schedule_survey.button"
                 >
@@ -333,7 +316,6 @@ export function Layout({
                 <button
                   type="button"
                   onClick={onAssignLeads}
-                  onKeyDown={(e) => e.key === "Enter" && onAssignLeads?.()}
                   className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 transition-colors w-full text-left"
                   data-ocid="quick.assign_leads.button"
                 >
@@ -352,8 +334,7 @@ export function Layout({
               </div>
             </div>
 
-            {/* Admin Controls */}
-            {isAdmin && (
+            {adminUser && (
               <div className="bg-card rounded-lg border border-border p-3">
                 <p className="text-xs font-bold text-gold uppercase tracking-widest mb-3">
                   Admin Controls
@@ -372,7 +353,7 @@ export function Layout({
                         Manage Users
                       </p>
                       <p className="text-[10px] text-muted-foreground">
-                        Approve & manage staff
+                        Create & manage staff
                       </p>
                     </div>
                   </Link>
@@ -386,10 +367,10 @@ export function Layout({
                     </span>
                     <div>
                       <p className="text-xs font-semibold text-foreground">
-                        District Settings
+                        Assignments
                       </p>
                       <p className="text-[10px] text-muted-foreground">
-                        Manage district leads
+                        Assign leads to team
                       </p>
                     </div>
                   </Link>

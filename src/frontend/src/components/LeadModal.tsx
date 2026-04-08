@@ -15,21 +15,35 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useInternetIdentity } from "@caffeineai/core-infrastructure";
-import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { Loader2, MessageSquare, Send } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { Lead, UserProfile } from "../backend";
-import { PipelineStage, UserRole } from "../backend";
-import type { District } from "../backend";
+import type { Lead, Remark, UserProfile } from "../backend";
+import { PipelineStage } from "../backend";
+import { useAddRemark } from "../hooks/useQueries";
+import { DEFAULT_DISTRICTS, formatDateTime } from "../types";
 
 interface LeadModalProps {
   open: boolean;
   onClose: () => void;
   editLead?: Lead | null;
-  districts: District[];
+  districts: string[];
   salesUsers: UserProfile[];
-  onSubmit: (lead: Lead) => Promise<void>;
+  currentUserId: string;
+  onSubmit: (params: {
+    customerName: string;
+    phone: string;
+    email: string;
+    address: string;
+    district: string;
+    requirements: {
+      panelSize: string;
+      systemType: string;
+      estimatedValue: bigint;
+      notes: string;
+    };
+    notes: string;
+  }) => Promise<void>;
 }
 
 export function LeadModal({
@@ -37,42 +51,48 @@ export function LeadModal({
   onClose,
   editLead,
   districts,
-  salesUsers,
   onSubmit,
 }: LeadModalProps) {
-  const { identity } = useInternetIdentity();
   const [loading, setLoading] = useState(false);
+  const [remarkText, setRemarkText] = useState("");
+  const addRemark = useAddRemark();
+  const allDistricts = districts.length > 0 ? districts : DEFAULT_DISTRICTS;
 
-  const [form, setForm] = useState<{
-    customerName: string;
-    phone: string;
-    email: string;
-    address: string;
-    district: string;
-    panelSize: string;
-    systemType: string;
-    estimatedValue: string;
-    reqNotes: string;
-    notes: string;
-    assignedSalesPerson: string;
-  }>(() => ({
-    customerName: editLead?.customerName ?? "",
-    phone: editLead?.phone ?? "",
-    email: editLead?.email ?? "",
-    address: editLead?.address ?? "",
-    district: editLead?.district ?? "",
-    panelSize: editLead?.requirements?.panelSize ?? "",
-    systemType: editLead?.requirements?.systemType ?? "",
-    estimatedValue: editLead?.requirements?.estimatedValue
-      ? String(editLead.requirements.estimatedValue)
-      : "",
-    reqNotes: editLead?.requirements?.notes ?? "",
-    notes: editLead?.notes ?? "",
-    assignedSalesPerson: editLead?.assignedSalesPerson?.toString() ?? "",
-  }));
+  const [form, setFormState] = useState({
+    customerName: "",
+    phone: "",
+    email: "",
+    address: "",
+    district: "",
+    panelSize: "",
+    systemType: "",
+    estimatedValue: "",
+    reqNotes: "",
+    notes: "",
+    assignedSalesPerson: "",
+  });
+
+  // Reset form when lead changes
+  useEffect(() => {
+    setFormState({
+      customerName: editLead?.customerName ?? "",
+      phone: editLead?.phone ?? "",
+      email: editLead?.email ?? "",
+      address: editLead?.address ?? "",
+      district: editLead?.district ?? "",
+      panelSize: editLead?.requirements?.panelSize ?? "",
+      systemType: editLead?.requirements?.systemType ?? "",
+      estimatedValue: editLead?.requirements?.estimatedValue
+        ? String(editLead.requirements.estimatedValue)
+        : "",
+      reqNotes: editLead?.requirements?.notes ?? "",
+      notes: editLead?.notes ?? "",
+      assignedSalesPerson: editLead?.assignedSalesPerson ?? "",
+    });
+  }, [editLead]);
 
   const set = (field: string, value: string) =>
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setFormState((prev) => ({ ...prev, [field]: value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,56 +100,58 @@ export function LeadModal({
       toast.error("Customer Name, Phone, and District are required.");
       return;
     }
-    if (!identity) {
-      toast.error("Not authenticated.");
-      return;
-    }
-
-    const now = BigInt(Date.now()) * BigInt(1_000_000);
-    const salesPrincipal = salesUsers.find(
-      (u) => u.principal.toString() === form.assignedSalesPerson,
-    )?.principal;
-
-    const lead: Lead = {
-      id: editLead?.id ?? BigInt(0),
-      customerName: form.customerName,
-      phone: form.phone,
-      email: form.email,
-      address: form.address,
-      district: form.district,
-      notes: form.notes,
-      stage: editLead?.stage ?? PipelineStage.inquiry,
-      requirements: {
-        panelSize: form.panelSize,
-        systemType: form.systemType,
-        estimatedValue: BigInt(
-          Math.max(0, Number.parseInt(form.estimatedValue || "0", 10)),
-        ),
-        notes: form.reqNotes,
-      },
-      assignedSalesPerson: salesPrincipal,
-      assignedOperationsPerson: editLead?.assignedOperationsPerson,
-      createdAt: editLead?.createdAt ?? now,
-      updatedAt: now,
-      createdBy: editLead?.createdBy ?? identity.getPrincipal(),
-    };
-
     setLoading(true);
     try {
-      await onSubmit(lead);
+      await onSubmit({
+        customerName: form.customerName,
+        phone: form.phone,
+        email: form.email,
+        address: form.address,
+        district: form.district,
+        requirements: {
+          panelSize: form.panelSize,
+          systemType: form.systemType,
+          estimatedValue: BigInt(
+            Math.max(0, Number.parseInt(form.estimatedValue || "0", 10)),
+          ),
+          notes: form.reqNotes,
+        },
+        notes: form.notes,
+      });
       toast.success(editLead ? "Lead updated!" : "Lead added!");
       onClose();
-    } catch (err: any) {
-      toast.error(err?.message ?? "Failed to save lead.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to save lead.";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
   };
 
+  const handleAddRemark = async () => {
+    if (!remarkText.trim() || !editLead) return;
+    try {
+      await addRemark.mutateAsync({
+        leadId: editLead.id,
+        content: remarkText.trim(),
+      });
+      setRemarkText("");
+      toast.success("Remark added!");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to add remark.";
+      toast.error(msg);
+    }
+  };
+
+  // Sort remarks newest-first
+  const sortedRemarks: Remark[] = editLead?.remarks
+    ? [...editLead.remarks].sort((a, b) => Number(b.addedAt - a.addedAt))
+    : [];
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent
-        className="max-w-xl bg-card border-border text-foreground max-h-[90vh] overflow-y-auto"
+        className="max-w-2xl bg-card border-border text-foreground max-h-[90vh] overflow-y-auto"
         data-ocid="lead.dialog"
       >
         <DialogHeader>
@@ -199,43 +221,13 @@ export function LeadModal({
                   <SelectValue placeholder="Select district" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border">
-                  {districts.map((d) => (
+                  {allDistricts.map((d) => (
                     <SelectItem
                       key={d}
                       value={d}
                       className="text-foreground hover:bg-muted"
                     >
                       {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground uppercase mb-1 block">
-                Assign Sales Person
-              </Label>
-              <Select
-                value={form.assignedSalesPerson}
-                onValueChange={(v) => set("assignedSalesPerson", v)}
-              >
-                <SelectTrigger className="bg-muted border-border text-foreground">
-                  <SelectValue placeholder="Select person" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border">
-                  <SelectItem
-                    value="__none__"
-                    className="text-muted-foreground"
-                  >
-                    None
-                  </SelectItem>
-                  {salesUsers.map((u) => (
-                    <SelectItem
-                      key={u.principal.toString()}
-                      value={u.principal.toString()}
-                      className="text-foreground hover:bg-muted"
-                    >
-                      {u.name} ({u.district})
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -312,7 +304,7 @@ export function LeadModal({
             />
           </div>
 
-          <div className="flex gap-2 justify-end pt-2">
+          <div className="flex gap-2 justify-end pt-2 border-t border-border">
             <Button
               type="button"
               variant="outline"
@@ -325,7 +317,7 @@ export function LeadModal({
             <Button
               type="submit"
               disabled={loading}
-              className="bg-gold text-navy-800 hover:bg-gold-dark font-semibold"
+              className="bg-gold text-[#0A1220] hover:bg-gold/90 font-semibold"
               data-ocid="lead.submit_button"
             >
               {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -333,6 +325,76 @@ export function LeadModal({
             </Button>
           </div>
         </form>
+
+        {/* Remarks section — only for existing leads */}
+        {editLead && (
+          <div className="border-t border-border pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <MessageSquare className="w-4 h-4 text-gold" />
+              <p className="text-xs font-bold text-gold uppercase tracking-widest">
+                Remarks Log
+              </p>
+              <span className="ml-auto text-xs text-muted-foreground">
+                {sortedRemarks.length} remarks
+              </span>
+            </div>
+            {/* Add remark */}
+            <div className="flex gap-2 mb-3">
+              <Input
+                value={remarkText}
+                onChange={(e) => setRemarkText(e.target.value)}
+                placeholder="Add a remark..."
+                className="bg-muted border-border text-foreground text-xs"
+                onKeyDown={(e) => e.key === "Enter" && handleAddRemark()}
+                data-ocid="remark.input"
+              />
+              <Button
+                size="sm"
+                className="bg-gold text-[#0A1220] hover:bg-gold/90 font-semibold flex-shrink-0"
+                onClick={handleAddRemark}
+                disabled={addRemark.isPending || !remarkText.trim()}
+                data-ocid="remark.submit_button"
+              >
+                {addRemark.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+              </Button>
+            </div>
+            {/* Remarks list */}
+            {sortedRemarks.length === 0 ? (
+              <p
+                className="text-xs text-muted-foreground text-center py-3"
+                data-ocid="remarks.empty_state"
+              >
+                No remarks yet. Add the first remark above.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-2 max-h-48 overflow-y-auto">
+                {sortedRemarks.map((remark, i) => (
+                  <div
+                    key={`${remark.addedAt.toString()}-${i}`}
+                    className="bg-muted/50 rounded-lg p-2.5 border border-border/50"
+                    data-ocid={`remark.item.${i + 1}`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[10px] font-bold text-gold">
+                        {remark.addedBy}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground ml-auto">
+                        {formatDateTime(remark.addedAt)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-foreground leading-relaxed">
+                      {remark.content}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

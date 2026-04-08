@@ -31,7 +31,6 @@ export default function Reports() {
     (sum, l) => sum + l.requirements.estimatedValue,
     BigInt(0),
   );
-
   const closedWonLeads = filteredLeads.filter(
     (l) => l.stage === PipelineStage.closedWon,
   );
@@ -39,7 +38,6 @@ export default function Reports() {
     (sum, l) => sum + l.requirements.estimatedValue,
     BigInt(0),
   );
-
   const maxStageCount = Math.max(
     1,
     ...stageCount.map(([, count]) => Number(count)),
