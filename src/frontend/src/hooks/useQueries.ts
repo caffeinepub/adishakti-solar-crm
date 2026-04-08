@@ -8,6 +8,7 @@ import type {
   UserRole,
 } from "../backend";
 import { createActor } from "../backend";
+import type { Quotation, QuotationInput, QuotationStatus } from "../types";
 
 // ── Auth helpers ───────────────────────────────────────────────────────────
 
@@ -261,22 +262,6 @@ export function useAllDistricts() {
   });
 }
 
-export function useAddDistrict() {
-  const { actor } = useActor(createActor);
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (name: string) => {
-      if (!actor) throw new Error("Not connected");
-      const token = getToken();
-      const res = await actor.addDistrict(token, name);
-      if (res.__kind__ === "err") throw new Error(res.err);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["districts"] });
-    },
-  });
-}
-
 // ── Users ──────────────────────────────────────────────────────────────────
 
 export function useAllUsers() {
@@ -373,6 +358,179 @@ export function useChangePassword() {
         params.newPassword,
       );
       if (res.__kind__ === "err") throw new Error(res.err);
+    },
+  });
+}
+
+// ── Delete Mutations ───────────────────────────────────────────────────────
+
+export function useDeleteLead() {
+  const { actor } = useActor(createActor);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (leadId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      const token = getToken();
+      const res = await actor.deleteLead(token, leadId);
+      if (res.__kind__ === "err") throw new Error(res.err);
+      return res.ok;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leads"] });
+    },
+  });
+}
+
+export function useDeleteUser() {
+  const { actor } = useActor(createActor);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      if (!actor) throw new Error("Not connected");
+      const token = getToken();
+      const res = await actor.deleteUser(token, userId);
+      if (res.__kind__ === "err") throw new Error(res.err);
+      return res.ok;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+}
+
+// ── Quotations ─────────────────────────────────────────────────────────────
+
+function parseQuotationStatus(raw: unknown): QuotationStatus {
+  if (raw && typeof raw === "object") {
+    if ("draft" in (raw as object)) return "draft";
+    if ("sent" in (raw as object)) return "sent";
+    if ("accepted" in (raw as object)) return "accepted";
+    if ("rejected" in (raw as object)) return "rejected";
+  }
+  return "draft";
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapQuotation(q: any): Quotation {
+  return {
+    id: String(q.id ?? ""),
+    leadId: String(q.leadId ?? ""),
+    quotationNumber: String(q.quotationNumber ?? ""),
+    createdAt: BigInt(q.createdAt ?? 0),
+    updatedAt: BigInt(q.updatedAt ?? 0),
+    createdBy: String(q.createdBy ?? ""),
+    customerName: String(q.customerName ?? ""),
+    customerAddress: String(q.customerAddress ?? ""),
+    systemType: String(q.systemType ?? ""),
+    panelCapacity: Number(q.panelCapacity ?? 0),
+    items: Array.isArray(q.items)
+      ? q.items.map(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (it: any) => ({
+            itemName: String(it.itemName ?? ""),
+            description: String(it.description ?? ""),
+            quantity: Number(it.quantity ?? 0),
+            unitPrice: Number(it.unitPrice ?? 0),
+          }),
+        )
+      : [],
+    subtotal: Number(q.subtotal ?? 0),
+    gstPercent: Number(q.gstPercent ?? 18),
+    gstAmount: Number(q.gstAmount ?? 0),
+    totalAmount: Number(q.totalAmount ?? 0),
+    notes: String(q.notes ?? ""),
+    validityDays: Number(q.validityDays ?? 30),
+    status: parseQuotationStatus(q.status),
+  };
+}
+
+export function useQuotationsByLead(leadId: string) {
+  const { actor, isFetching } = useActor(createActor);
+  const token = getToken();
+  return useQuery<Quotation[]>({
+    queryKey: ["quotations", leadId],
+    queryFn: async () => {
+      if (!actor || !token || !leadId) return [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await (actor as any).getQuotationsByLead(token, leadId);
+      if (!Array.isArray(res)) return [];
+      return res.map(mapQuotation);
+    },
+    enabled: !!actor && !isFetching && !!token && !!leadId,
+  });
+}
+
+export function useCreateQuotation() {
+  const { actor } = useActor(createActor);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { leadId: string; input: QuotationInput }) => {
+      if (!actor) throw new Error("Not connected");
+      const token = getToken();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await (actor as any).createQuotation(
+        token,
+        params.leadId,
+        params.input,
+      );
+      if (res && res.__kind__ === "err") throw new Error(res.err);
+      return mapQuotation(res.__kind__ === "ok" ? res.ok : res);
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["quotations", vars.leadId] });
+    },
+  });
+}
+
+export function useUpdateQuotation() {
+  const { actor } = useActor(createActor);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      id: string;
+      leadId: string;
+      input: QuotationInput;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      const token = getToken();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await (actor as any).updateQuotation(
+        token,
+        params.id,
+        params.input,
+      );
+      if (res && res.__kind__ === "err") throw new Error(res.err);
+      return mapQuotation(res.__kind__ === "ok" ? res.ok : res);
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["quotations", vars.leadId] });
+    },
+  });
+}
+
+export function useUpdateQuotationStatus() {
+  const { actor } = useActor(createActor);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      id: string;
+      leadId: string;
+      status: QuotationStatus;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      const token = getToken();
+      const statusCandid = { [params.status]: null };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await (actor as any).updateQuotationStatus(
+        token,
+        params.id,
+        statusCandid,
+      );
+      if (res && res.__kind__ === "err") throw new Error(res.err);
+      return mapQuotation(res.__kind__ === "ok" ? res.ok : res);
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: ["quotations", vars.leadId] });
     },
   });
 }

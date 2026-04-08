@@ -27,7 +27,7 @@ export default function Pipeline() {
   const [editLead, setEditLead] = useState<Lead | null>(null);
   const [stageLead, setStageLead] = useState<Lead | null>(null);
   const [addLeadOpen, setAddLeadOpen] = useState(false);
-  const { userId } = useAuth();
+  const { userId, userRole } = useAuth();
 
   const { data: allLeads = [] } = useAllLeads();
   const { data: districts = [] } = useAllDistricts();
@@ -142,6 +142,7 @@ export default function Pipeline() {
         districts={districts}
         salesUsers={salesUsers}
         currentUserId={userId ?? ""}
+        currentUserRole={userRole ?? undefined}
         onSubmit={async (params) => {
           if (editLead) {
             await updateLead.mutateAsync({ leadId: editLead.id, ...params });

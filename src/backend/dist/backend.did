@@ -37,6 +37,52 @@ type Remark =
    addedBy: text;
    content: text;
  };
+type QuotationStatus = 
+ variant {
+   accepted;
+   draft;
+   rejected;
+   sent;
+ };
+type QuotationItem = 
+ record {
+   description: text;
+   itemName: text;
+   quantity: float64;
+   unitPrice: float64;
+ };
+type QuotationInput = 
+ record {
+   customerAddress: text;
+   customerName: text;
+   gstPercent: float64;
+   items: vec QuotationItem;
+   notes: text;
+   panelCapacity: float64;
+   systemType: text;
+   validityDays: nat;
+ };
+type Quotation = 
+ record {
+   createdAt: Time;
+   createdBy: text;
+   customerAddress: text;
+   customerName: text;
+   gstAmount: float64;
+   gstPercent: float64;
+   id: text;
+   items: vec QuotationItem;
+   leadId: text;
+   notes: text;
+   panelCapacity: float64;
+   quotationNumber: text;
+   status: QuotationStatus;
+   subtotal: float64;
+   systemType: text;
+   totalAmount: float64;
+   updatedAt: Time;
+   validityDays: nat;
+ };
 type PipelineStage = 
  variant {
    bookingConfirmed;
@@ -66,10 +112,6 @@ type Lead =
  };
 service : {
   _initializeAccessControl: () -> ();
-  addDistrict: (sessionToken: text, name: text) -> (variant {
-                                                      err: text;
-                                                      ok;
-                                                    });
   addLead: (sessionToken: text, customerName: text, phone: text, email: 
    text, address: text, district: text, requirements: Requirement, notes:
    text) -> (variant {
@@ -97,17 +139,37 @@ service : {
       err: text;
       ok;
     });
+  createQuotation: (sessionToken: text, leadId: text, data:
+   QuotationInput) -> (variant {
+                         err: text;
+                         ok: Quotation;
+                       });
   createUser: (sessionToken: text, userId: text, password: text, name: 
    text, role: UserRole, district: text, phone: text, email: text,
    whatsAppNumber: text) -> (variant {
                                err: text;
                                ok;
                              });
+  deleteLead: (sessionToken: text, leadId: nat) ->
+   (variant {
+      err: text;
+      ok: text;
+    });
+  deleteUser: (sessionToken: text, userId: text) ->
+   (variant {
+      err: text;
+      ok: text;
+    });
   getAllDistricts: () -> (vec text) query;
   getAllLeads: (sessionToken: text) ->
    (variant {
       err: text;
       ok: vec Lead;
+    }) query;
+  getAllQuotations: (sessionToken: text) ->
+   (variant {
+      err: text;
+      ok: vec Quotation;
     }) query;
   getAllUsers: (sessionToken: text) ->
    (variant {
@@ -161,6 +223,16 @@ service : {
       err: text;
       ok: UserProfile;
     }) query;
+  getQuotationById: (sessionToken: text, id: text) ->
+   (variant {
+      err: text;
+      ok: opt Quotation;
+    }) query;
+  getQuotationsByLead: (sessionToken: text, leadId: text) ->
+   (variant {
+      err: text;
+      ok: vec Quotation;
+    }) query;
   getTotalLeadsCount: (sessionToken: text) ->
    (variant {
       err: text;
@@ -177,6 +249,7 @@ service : {
                                                 ok: text;
                                               });
   logout: (sessionToken: text) -> ();
+  seedDistricts: () -> (vec text) query;
   updateLead: (sessionToken: text, leadId: nat, customerName: text, phone:
    text, email: text, address: text, district: text, requirements:
    Requirement, notes: text) -> (variant {
@@ -188,6 +261,16 @@ service : {
                       err: text;
                       ok: Lead;
                     });
+  updateQuotation: (sessionToken: text, id: text, data: QuotationInput) ->
+   (variant {
+      err: text;
+      ok: Quotation;
+    });
+  updateQuotationStatus: (sessionToken: text, id: text, status:
+   QuotationStatus) -> (variant {
+                          err: text;
+                          ok: Quotation;
+                        });
   updateUser: (sessionToken: text, userId: text, name: text, district: 
    text, phone: text, email: text, whatsAppNumber: text, isActive: bool) ->
    (variant {

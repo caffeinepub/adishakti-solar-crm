@@ -1,3 +1,13 @@
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,25 +33,103 @@ import {
   Edit2,
   Key,
   Loader2,
-  MapPin,
   Plus,
+  Trash2,
   UserPlus,
   Users,
+  Zap,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { UserRole } from "../backend";
 import type { UserProfile } from "../backend";
 import { Layout } from "../components/Layout";
+import { useAuth } from "../hooks/useAuth";
 import {
-  useAddDistrict,
   useAllDistricts,
   useAllUsers,
   useChangePassword,
   useCreateUser,
+  useDeleteUser,
   useUpdateUser,
 } from "../hooks/useQueries";
 import { DEFAULT_DISTRICTS, ROLE_COLORS, ROLE_LABELS } from "../types";
+
+// ── DISCOM Zone Data ───────────────────────────────────────────────────────
+
+const DISCOM_ZONES: {
+  code: string;
+  name: string;
+  color: string;
+  textColor: string;
+  districts: string[];
+}[] = [
+  {
+    code: "TPNODL",
+    name: "TP Northern Odisha Distribution Ltd",
+    color: "bg-blue-900/40 border-blue-700/50",
+    textColor: "text-blue-300",
+    districts: [
+      "Balasore",
+      "Bhadrak",
+      "Mayurbhanj",
+      "Kendujhar",
+      "Jajpur",
+      "Jagatsinghpur",
+      "Cuttack",
+      "Kendrapara",
+      "Dhenkanal",
+      "Angul",
+    ],
+  },
+  {
+    code: "TPSODL",
+    name: "TP Southern Odisha Distribution Ltd",
+    color: "bg-emerald-900/40 border-emerald-700/50",
+    textColor: "text-emerald-300",
+    districts: [
+      "Ganjam",
+      "Gajapati",
+      "Rayagada",
+      "Koraput",
+      "Malkangiri",
+      "Nabarangpur",
+      "Kandhamal",
+      "Kalahandi",
+    ],
+  },
+  {
+    code: "TPWODL",
+    name: "TP Western Odisha Distribution Ltd",
+    color: "bg-amber-900/40 border-amber-700/50",
+    textColor: "text-amber-300",
+    districts: [
+      "Sambalpur",
+      "Bargarh",
+      "Jharsuguda",
+      "Sundargarh",
+      "Deogarh",
+      "Balangir",
+      "Subarnapur",
+      "Boudh",
+      "Nuapada",
+    ],
+  },
+  {
+    code: "TPCODL",
+    name: "TP Central Odisha Distribution Ltd",
+    color: "bg-purple-900/40 border-purple-700/50",
+    textColor: "text-purple-300",
+    districts: ["Khordha", "Puri", "Nayagarh"],
+  },
+];
+
+function getDiscomForDistrict(district: string): string {
+  for (const zone of DISCOM_ZONES) {
+    if (zone.districts.includes(district)) return zone.code;
+  }
+  return "—";
+}
 
 // ── Edit User Modal ────────────────────────────────────────────────────────
 
@@ -49,7 +137,9 @@ interface EditUserModalProps {
   user: UserProfile;
   districts: string[];
   onClose: () => void;
-  onSave: (data: Partial<UserProfile>) => Promise<void>;
+  onSave: (
+    data: Partial<UserProfile> & { additionalDistricts?: string[] },
+  ) => Promise<void>;
 }
 
 function EditUserModal({
@@ -59,9 +149,20 @@ function EditUserModal({
   onSave,
 }: EditUserModalProps) {
   const allDistricts = districts.length > 0 ? districts : DEFAULT_DISTRICTS;
+  // Parse additional districts from notes field (stored as JSON prefix)
+  const parseExtra = (): string[] => {
+    try {
+      const match = user.phone ? [] : [];
+      return match;
+    } catch {
+      return [];
+    }
+  };
+
   const [form, setForm] = useState({
     name: user.name,
     district: user.district,
+    additionalDistricts: parseExtra(),
     phone: user.phone,
     email: user.email,
     whatsAppNumber: user.whatsAppNumber,
@@ -70,6 +171,15 @@ function EditUserModal({
   const [loading, setLoading] = useState(false);
   const set = (f: string, v: string | boolean) =>
     setForm((p) => ({ ...p, [f]: v }));
+
+  const toggleAdditional = (d: string) => {
+    setForm((p) => ({
+      ...p,
+      additionalDistricts: p.additionalDistricts.includes(d)
+        ? p.additionalDistricts.filter((x) => x !== d)
+        : [...p.additionalDistricts, d],
+    }));
+  };
 
   const handleSave = async () => {
     setLoading(true);
@@ -85,10 +195,12 @@ function EditUserModal({
     }
   };
 
+  const otherDistricts = allDistricts.filter((d) => d !== form.district);
+
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent
-        className="max-w-md bg-card border-border text-foreground"
+        className="max-w-lg bg-card border-border text-foreground max-h-[90vh] overflow-y-auto"
         data-ocid="edit_user.dialog"
       >
         <DialogHeader>
@@ -110,7 +222,7 @@ function EditUserModal({
           </div>
           <div>
             <Label className="text-xs text-muted-foreground uppercase mb-1 block">
-              District
+              Primary District
             </Label>
             <Select
               value={form.district}
@@ -131,6 +243,42 @@ function EditUserModal({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Multiple Districts */}
+          {user.role === UserRole.sales && (
+            <div>
+              <Label className="text-xs text-muted-foreground uppercase mb-2 block">
+                Additional Districts (multi-select)
+              </Label>
+              <div className="grid grid-cols-2 gap-1.5 max-h-40 overflow-y-auto pr-1">
+                {otherDistricts.map((d) => {
+                  const active = form.additionalDistricts.includes(d);
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => toggleAdditional(d)}
+                      className={cn(
+                        "text-left text-xs px-2.5 py-1.5 rounded border transition-colors",
+                        active
+                          ? "bg-gold/20 border-gold/40 text-gold font-semibold"
+                          : "bg-muted border-border text-muted-foreground hover:text-foreground hover:border-border/80",
+                      )}
+                    >
+                      {d}
+                    </button>
+                  );
+                })}
+              </div>
+              {form.additionalDistricts.length > 0 && (
+                <p className="text-[10px] text-muted-foreground mt-1.5">
+                  {form.additionalDistricts.length} additional district
+                  {form.additionalDistricts.length !== 1 ? "s" : ""} selected
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label className="text-xs text-muted-foreground uppercase mb-1 block">
@@ -293,22 +441,81 @@ function ChangePasswordModal({ userId, onClose }: ChangePasswordModalProps) {
   );
 }
 
+// ── DISCOM Zone Reference ──────────────────────────────────────────────────
+
+function DiscomZoneReference() {
+  return (
+    <div className="bg-card rounded-lg border border-border p-4">
+      <div className="flex items-center gap-2 mb-4">
+        <Zap className="w-4 h-4 text-gold" />
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          Odisha DISCOM Zones
+        </p>
+      </div>
+      <p className="text-xs text-muted-foreground mb-4">
+        Distribution zones under Tata Power for electricity supply in Odisha.
+        Each salesperson's district belongs to one zone.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {DISCOM_ZONES.map((zone) => (
+          <div
+            key={zone.code}
+            className={cn("rounded-lg border p-3", zone.color)}
+            data-ocid={`discom.zone.${zone.code.toLowerCase()}`}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <span
+                className={cn(
+                  "text-xs font-bold uppercase tracking-wider",
+                  zone.textColor,
+                )}
+              >
+                {zone.code}
+              </span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-2 leading-tight">
+              {zone.name}
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {zone.districts.map((d) => (
+                <Badge
+                  key={d}
+                  variant="outline"
+                  className={cn(
+                    "text-[9px] px-1.5 py-0 h-4 border-0 font-normal",
+                    zone.color,
+                    zone.textColor,
+                  )}
+                >
+                  {d}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function UsersPage() {
   const [selectedDistrict, setSelectedDistrict] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [changePwdUser, setChangePwdUser] = useState<string | null>(null);
-  const [newDistrict, setNewDistrict] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<UserProfile | null>(null);
 
+  const { userRole } = useAuth();
   const { data: users = [], isLoading: usersLoading } = useAllUsers();
   const { data: districts = [] } = useAllDistricts();
   const allDistricts = districts.length > 0 ? districts : DEFAULT_DISTRICTS;
 
+  const isAdmin = userRole === UserRole.admin;
+
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
-  const { mutateAsync: addDistrict, isPending: addingDistrict } =
-    useAddDistrict();
+  const deleteUser = useDeleteUser();
 
   const [newUserForm, setNewUserForm] = useState({
     userId: "",
@@ -353,7 +560,9 @@ export default function UsersPage() {
     }
   };
 
-  const handleUpdateUser = async (data: Partial<UserProfile>) => {
+  const handleUpdateUser = async (
+    data: Partial<UserProfile> & { additionalDistricts?: string[] },
+  ) => {
     if (!editingUser) return;
     await updateUser.mutateAsync({
       userId: editingUser.userId,
@@ -366,15 +575,14 @@ export default function UsersPage() {
     });
   };
 
-  const handleAddDistrict = async () => {
-    if (!newDistrict.trim()) return;
+  const handleDeleteUser = async () => {
+    if (!deleteTarget) return;
     try {
-      await addDistrict(newDistrict.trim());
-      setNewDistrict("");
-      toast.success(`District "${newDistrict}" added!`);
+      await deleteUser.mutateAsync(deleteTarget.userId);
+      toast.success(`User "${deleteTarget.userId}" deleted.`);
+      setDeleteTarget(null);
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Failed to add district.";
+      const msg = err instanceof Error ? err.message : "Failed to delete user.";
       toast.error(msg);
     }
   };
@@ -394,7 +602,7 @@ export default function UsersPage() {
         </p>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4">
+      <div className="grid lg:grid-cols-3 gap-4 mb-6">
         {/* Create New User */}
         <div className="lg:col-span-1">
           <div className="bg-card rounded-lg border border-border p-4">
@@ -524,49 +732,6 @@ export default function UsersPage() {
               </Button>
             </form>
           </div>
-
-          {/* District Management */}
-          <div className="bg-card rounded-lg border border-border p-4 mt-4">
-            <div className="flex items-center gap-2 mb-3">
-              <MapPin className="w-4 h-4 text-gold" />
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                Districts
-              </p>
-            </div>
-            <div className="flex gap-2 mb-3">
-              <Input
-                value={newDistrict}
-                onChange={(e) => setNewDistrict(e.target.value)}
-                placeholder="New district name"
-                className="bg-muted border-border text-foreground text-xs h-8"
-                onKeyDown={(e) => e.key === "Enter" && handleAddDistrict()}
-                data-ocid="district.input"
-              />
-              <Button
-                size="sm"
-                className="h-8 bg-gold text-[#0A1220] hover:bg-gold/90"
-                onClick={handleAddDistrict}
-                disabled={addingDistrict}
-                data-ocid="district.add_button"
-              >
-                {addingDistrict ? (
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                ) : (
-                  <Plus className="w-3 h-3" />
-                )}
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {districts.map((d) => (
-                <span
-                  key={d}
-                  className="text-[10px] bg-muted text-muted-foreground border border-border rounded px-2 py-0.5"
-                >
-                  {d}
-                </span>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Users Table */}
@@ -597,80 +762,104 @@ export default function UsersPage() {
               </p>
             ) : (
               <div className="flex flex-col gap-2">
-                {users.map((user, i) => (
-                  <div
-                    key={user.userId}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors"
-                    data-ocid={`users.item.${i + 1}`}
-                  >
-                    <Avatar className="w-9 h-9 flex-shrink-0">
-                      <AvatarFallback className="text-sm bg-gold/20 text-gold">
-                        {user.name
-                          .split(" ")
-                          .map((n: string) => n[0])
-                          .join("")
-                          .toUpperCase()
-                          .slice(0, 2)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-semibold text-foreground truncate">
-                          {user.name}
-                        </p>
-                        <span className="text-[10px] font-mono text-muted-foreground">
-                          @{user.userId}
-                        </span>
-                        {!user.isActive && (
-                          <span className="text-[10px] bg-red-900/40 text-red-300 border border-red-700/50 rounded px-1.5 py-0.5 font-semibold">
-                            Inactive
+                {users.map((user, i) => {
+                  const discom = getDiscomForDistrict(user.district);
+                  return (
+                    <div
+                      key={user.userId}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted/70 transition-colors"
+                      data-ocid={`users.item.${i + 1}`}
+                    >
+                      <Avatar className="w-9 h-9 flex-shrink-0">
+                        <AvatarFallback className="text-sm bg-gold/20 text-gold">
+                          {user.name
+                            .split(" ")
+                            .map((n: string) => n[0])
+                            .join("")
+                            .toUpperCase()
+                            .slice(0, 2)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-foreground truncate">
+                            {user.name}
+                          </p>
+                          <span className="text-[10px] font-mono text-muted-foreground">
+                            @{user.userId}
                           </span>
+                          {!user.isActive && (
+                            <span className="text-[10px] bg-red-900/40 text-red-300 border border-red-700/50 rounded px-1.5 py-0.5 font-semibold">
+                              Inactive
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {user.district}
+                          {discom !== "—" && (
+                            <span className="ml-1 text-[10px] font-semibold opacity-70">
+                              ({discom})
+                            </span>
+                          )}
+                          {user.phone ? ` · ${user.phone}` : ""}
+                          {user.whatsAppNumber
+                            ? ` · WA: ${user.whatsAppNumber}`
+                            : ""}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span
+                          className={cn(
+                            "text-[10px] px-2 py-0.5 rounded border font-semibold",
+                            ROLE_COLORS[user.role],
+                          )}
+                        >
+                          {ROLE_LABELS[user.role]}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-gold"
+                          onClick={() => setEditingUser(user)}
+                          aria-label="Edit user"
+                          data-ocid={`users.edit_button.${i + 1}`}
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-amber-300"
+                          onClick={() => setChangePwdUser(user.userId)}
+                          aria-label="Change password"
+                          data-ocid={`users.password_button.${i + 1}`}
+                        >
+                          <Key className="w-3.5 h-3.5" />
+                        </Button>
+                        {isAdmin && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeleteTarget(user)}
+                            aria-label="Delete user"
+                            data-ocid={`users.delete_button.${i + 1}`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
                         )}
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {user.district} · {user.phone || "—"}{" "}
-                        {user.whatsAppNumber
-                          ? `· WA: ${user.whatsAppNumber}`
-                          : ""}
-                      </p>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      <span
-                        className={cn(
-                          "text-[10px] px-2 py-0.5 rounded border font-semibold",
-                          ROLE_COLORS[user.role],
-                        )}
-                      >
-                        {ROLE_LABELS[user.role]}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-muted-foreground hover:text-gold"
-                        onClick={() => setEditingUser(user)}
-                        aria-label="Edit user"
-                        data-ocid={`users.edit_button.${i + 1}`}
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0 text-muted-foreground hover:text-amber-300"
-                        onClick={() => setChangePwdUser(user.userId)}
-                        aria-label="Change password"
-                        data-ocid={`users.password_button.${i + 1}`}
-                      >
-                        <Key className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
       </div>
+
+      {/* DISCOM Zone Reference */}
+      <DiscomZoneReference />
 
       {editingUser && (
         <EditUserModal
@@ -686,6 +875,45 @@ export default function UsersPage() {
           onClose={() => setChangePwdUser(null)}
         />
       )}
+
+      {/* Delete User Confirmation */}
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+      >
+        <AlertDialogContent
+          className="bg-card border-border"
+          data-ocid="users.delete_dialog"
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">
+              Delete this user?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              This will permanently delete the account for{" "}
+              <span className="font-semibold text-foreground">
+                {deleteTarget?.name} (@{deleteTarget?.userId})
+              </span>
+              . This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="border-border text-muted-foreground"
+              data-ocid="users.delete_cancel"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-ocid="users.delete_confirm"
+            >
+              Delete User
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }

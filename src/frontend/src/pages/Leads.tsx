@@ -1,3 +1,13 @@
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -8,8 +18,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Edit2, Eye, Filter, Search, UserPlus, Zap } from "lucide-react";
+import {
+  Edit2,
+  Eye,
+  Filter,
+  Search,
+  Trash2,
+  UserPlus,
+  Zap,
+} from "lucide-react";
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import type { Lead } from "../backend";
 import { UserRole } from "../backend";
 import { Layout } from "../components/Layout";
@@ -22,6 +41,7 @@ import {
   useAllDistricts,
   useAllLeads,
   useAllUsers,
+  useDeleteLead,
   useUpdateLead,
   useUpdateLeadStage,
 } from "../hooks/useQueries";
@@ -39,7 +59,8 @@ export default function Leads() {
   const [addLeadOpen, setAddLeadOpen] = useState(false);
   const [editLead, setEditLead] = useState<Lead | null>(null);
   const [stageLead, setStageLead] = useState<Lead | null>(null);
-  const { userId } = useAuth();
+  const [deleteTarget, setDeleteTarget] = useState<Lead | null>(null);
+  const { userId, userRole } = useAuth();
 
   const { data: allLeads = [], isLoading } = useAllLeads();
   const { data: districts = [] } = useAllDistricts();
@@ -47,6 +68,11 @@ export default function Leads() {
   const addLead = useAddLead();
   const updateLead = useUpdateLead();
   const updateStage = useUpdateLeadStage();
+  const deleteLead = useDeleteLead();
+
+  const isAdmin = userRole === UserRole.admin;
+  const canAddLead =
+    userRole === UserRole.admin || userRole === UserRole.backoffice;
 
   const salesUsers = users.filter((u) => u.role === UserRole.sales);
 
@@ -68,11 +94,23 @@ export default function Leads() {
     return [...leads].sort((a, b) => Number(b.createdAt - a.createdAt));
   }, [allLeads, selectedDistrict, stageFilter, search]);
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await deleteLead.mutateAsync(deleteTarget.id);
+      toast.success(`Lead for ${deleteTarget.customerName} deleted.`);
+      setDeleteTarget(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to delete lead.";
+      toast.error(msg);
+    }
+  };
+
   return (
     <Layout
       selectedDistrict={selectedDistrict}
       onDistrictChange={setSelectedDistrict}
-      onAddLead={() => setAddLeadOpen(true)}
+      onAddLead={canAddLead ? () => setAddLeadOpen(true) : undefined}
     >
       <div className="mb-6">
         <div className="flex items-center justify-between">
@@ -85,13 +123,15 @@ export default function Leads() {
               {selectedDistrict ? ` in ${selectedDistrict}` : ""}
             </p>
           </div>
-          <Button
-            className="bg-gold text-[#0A1220] hover:bg-gold/90 font-semibold"
-            onClick={() => setAddLeadOpen(true)}
-            data-ocid="leads.add_lead.button"
-          >
-            <UserPlus className="w-4 h-4 mr-2" /> Add Lead
-          </Button>
+          {canAddLead && (
+            <Button
+              className="bg-gold text-[#0A1220] hover:bg-gold/90 font-semibold"
+              onClick={() => setAddLeadOpen(true)}
+              data-ocid="leads.add_lead.button"
+            >
+              <UserPlus className="w-4 h-4 mr-2" /> Add Lead
+            </Button>
+          )}
         </div>
       </div>
 
@@ -143,13 +183,15 @@ export default function Leads() {
           <div className="p-10 text-center" data-ocid="leads.empty_state">
             <Zap className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
             <p className="text-muted-foreground">No leads found.</p>
-            <Button
-              size="sm"
-              className="mt-3 bg-gold text-[#0A1220] hover:bg-gold/90"
-              onClick={() => setAddLeadOpen(true)}
-            >
-              Add Lead
-            </Button>
+            {canAddLead && (
+              <Button
+                size="sm"
+                className="mt-3 bg-gold text-[#0A1220] hover:bg-gold/90"
+                onClick={() => setAddLeadOpen(true)}
+              >
+                Add Lead
+              </Button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -218,6 +260,7 @@ export default function Leads() {
                             variant="ghost"
                             className="h-7 w-7 p-0 text-muted-foreground hover:text-gold"
                             onClick={() => setStageLead(lead)}
+                            aria-label="Edit stage"
                             data-ocid={`leads.edit_button.${i + 1}`}
                           >
                             <Edit2 className="w-3.5 h-3.5" />
@@ -227,10 +270,23 @@ export default function Leads() {
                             variant="ghost"
                             className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
                             onClick={() => setEditLead(lead)}
+                            aria-label="View lead"
                             data-ocid={`leads.secondary_button.${i + 1}`}
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </Button>
+                          {isAdmin && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                              onClick={() => setDeleteTarget(lead)}
+                              aria-label="Delete lead"
+                              data-ocid={`leads.delete_button.${i + 1}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -252,6 +308,8 @@ export default function Leads() {
         districts={districts}
         salesUsers={salesUsers}
         currentUserId={userId ?? ""}
+        currentUserRole={userRole ?? undefined}
+        onDelete={isAdmin ? (lead) => setDeleteTarget(lead) : undefined}
         onSubmit={async (params) => {
           if (editLead) {
             await updateLead.mutateAsync({ leadId: editLead.id, ...params });
@@ -268,6 +326,45 @@ export default function Leads() {
           await updateStage.mutateAsync({ id, stage, notes });
         }}
       />
+
+      {/* Delete Confirmation */}
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => !v && setDeleteTarget(null)}
+      >
+        <AlertDialogContent
+          className="bg-card border-border"
+          data-ocid="leads.delete_dialog"
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">
+              Delete this lead?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              This will permanently delete the lead for{" "}
+              <span className="font-semibold text-foreground">
+                {deleteTarget?.customerName}
+              </span>
+              . This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="border-border text-muted-foreground"
+              data-ocid="leads.delete_cancel"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-ocid="leads.delete_confirm"
+            >
+              Delete Lead
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }

@@ -1,15 +1,16 @@
 
 import Map "mo:core/Map";
-import List "mo:core/List";
 import Text "mo:core/Text";
 import Nat "mo:core/Nat";
 import Time "mo:core/Time";
 import Runtime "mo:core/Runtime";
-import Migration "migration";
+
 import MixinAuthorization "mo:caffeineai-authorization/MixinAuthorization";
 import AccessControl "mo:caffeineai-authorization/access-control";
 
-(with migration = Migration.run)
+
+
+
 actor {
 
   // Authorization mixin (retained for platform lint compliance)
@@ -85,17 +86,81 @@ actor {
   };
 
   // ─────────────────────────────────────────────
+  //  QUOTATION TYPES
+  // ─────────────────────────────────────────────
+
+  public type QuotationItem = {
+    itemName    : Text;
+    description : Text;
+    quantity    : Float;
+    unitPrice   : Float;
+  };
+
+  public type QuotationStatus = {
+    #draft;
+    #sent;
+    #accepted;
+    #rejected;
+  };
+
+  public type Quotation = {
+    id              : Text;
+    leadId          : Text;
+    quotationNumber : Text;
+    createdAt       : Time.Time;
+    updatedAt       : Time.Time;
+    createdBy       : Text;
+    customerName    : Text;
+    customerAddress : Text;
+    systemType      : Text;
+    panelCapacity   : Float;
+    items           : [QuotationItem];
+    subtotal        : Float;
+    gstPercent      : Float;
+    gstAmount       : Float;
+    totalAmount     : Float;
+    notes           : Text;
+    validityDays    : Nat;
+    status          : QuotationStatus;
+  };
+
+  public type QuotationInput = {
+    customerName    : Text;
+    customerAddress : Text;
+    systemType      : Text;
+    panelCapacity   : Float;
+    items           : [QuotationItem];
+    gstPercent      : Float;
+    notes           : Text;
+    validityDays    : Nat;
+  };
+
+  // ─────────────────────────────────────────────
   //  STATE
   // ─────────────────────────────────────────────
 
-  let users    = Map.empty<Text, UserProfile>();
-  let sessions = Map.empty<Text, SessionData>();
-  let leads    = Map.empty<Nat, Lead>();
-  let districts = List.empty<Text>();
-  var nextLeadId : Nat = 1;
+  let users       = Map.empty<Text, UserProfile>();
+  let sessions    = Map.empty<Text, SessionData>();
+  let leads       = Map.empty<Nat, Lead>();
+  let quotations  = Map.empty<Text, Quotation>();
+  var nextLeadId       : Nat = 1;
+  var nextQuotationSeq : Nat = 1;
 
   // ─────────────────────────────────────────────
-  //  INIT — seed admin + districts
+  //  DISTRICTS — fixed, Odisha-only
+  // ─────────────────────────────────────────────
+
+  let odishaDistricts : [Text] = [
+    "Angul", "Balangir", "Balasore", "Bargarh", "Bhadrak",
+    "Boudh", "Cuttack", "Deogarh", "Dhenkanal", "Gajapati",
+    "Ganjam", "Jagatsinghpur", "Jajpur", "Jharsuguda", "Kalahandi",
+    "Kandhamal", "Kendrapara", "Kendujhar", "Khordha", "Koraput",
+    "Malkangiri", "Mayurbhanj", "Nabarangpur", "Nayagarh", "Nuapada",
+    "Puri", "Rayagada", "Sambalpur", "Subarnapur", "Sundargarh"
+  ];
+
+  // ─────────────────────────────────────────────
+  //  INIT — seed admin
   // ─────────────────────────────────────────────
 
   let adminProfile : UserProfile = {
@@ -110,16 +175,6 @@ actor {
     isActive     = true;
   };
   users.add("admin", adminProfile);
-
-  let defaultDistricts = [
-    "Angul", "Balangir", "Balasore", "Bargarh", "Bhadrak",
-    "Boudh", "Cuttack", "Deogarh", "Dhenkanal", "Gajapati",
-    "Ganjam", "Jagatsinghpur", "Jajpur", "Jharsuguda", "Kalahandi",
-    "Kandhamal", "Kendrapara", "Kendujhar", "Khordha", "Koraput",
-    "Malkangiri", "Mayurbhanj", "Nabarangpur", "Nayagarh", "Nuapada",
-    "Puri", "Rayagada", "Sambalpur", "Subarnapur", "Sundargarh"
-  ];
-  districts.addAll(defaultDistricts.values());
 
   // ─────────────────────────────────────────────
   //  INTERNAL HELPERS
@@ -172,7 +227,7 @@ actor {
     u;
   };
 
-  // Admin or backoffice can assign leads
+  // Admin or backoffice can assign leads / create quotations
   func canAssignLeads(role : UserRole) : Bool {
     role == #admin or role == #backoffice;
   };
@@ -194,6 +249,37 @@ actor {
       return true;
     };
     false;
+  };
+
+  // Pad number to 3 digits
+  func padNat(n : Nat) : Text {
+    let s = n.toText();
+    if (n < 10)  { "00" # s }
+    else if (n < 100) { "0" # s }
+    else { s };
+  };
+
+  // Generate quotation number: QT-YYYY-NNN
+  func nextQuotationNumber() : Text {
+    // Time.now() is nanoseconds since epoch (Int)
+    // Approximate year from nanoseconds
+    let nsPerYear : Int = 365 * 24 * 60 * 60 * 1_000_000_000;
+    let epochYear = 1970;
+    let yearsSince = (Time.now() / nsPerYear).toNat();
+    let year = epochYear + yearsSince;
+    let seq = nextQuotationSeq;
+    nextQuotationSeq += 1;
+    "QT-" # year.toText() # "-" # padNat(seq);
+  };
+
+  // Compute subtotal, gstAmount, totalAmount from items + gstPercent
+  func computeTotals(items : [QuotationItem], gstPercent : Float) : (Float, Float, Float) {
+    var sub : Float = 0.0;
+    for (item in items.values()) {
+      sub += item.quantity * item.unitPrice;
+    };
+    let gst = sub * gstPercent / 100.0;
+    (sub, gst, sub + gst);
   };
 
   // ─────────────────────────────────────────────
@@ -557,7 +643,7 @@ actor {
     };
     let all = leads.values().toArray();
     #ok(
-      districts.toArray().map<Text, (Text, Nat)>(func(d : Text) : (Text, Nat) {
+      odishaDistricts.map<Text, (Text, Nat)>(func(d : Text) : (Text, Nat) {
         (d, all.filter(func(l : Lead) : Bool { Text.equal(l.district, d) }).size())
       })
     );
@@ -598,17 +684,186 @@ actor {
   };
 
   // ─────────────────────────────────────────────
-  //  DISTRICTS
+  //  DISTRICTS — Odisha only, read-only
   // ─────────────────────────────────────────────
 
   public query func getAllDistricts() : async [Text] {
-    districts.toArray();
+    odishaDistricts;
   };
 
-  public shared func addDistrict(sessionToken : Text, name : Text) : async { #ok : (); #err : Text } {
-    ignore requireAdmin(sessionToken);
-    districts.add(name);
-    #ok(());
+  // seedDistricts kept for compatibility — always returns the fixed Odisha list
+  public query func seedDistricts() : async [Text] {
+    odishaDistricts;
+  };
+
+  // ─────────────────────────────────────────────
+  //  QUOTATIONS
+  // ─────────────────────────────────────────────
+
+  public shared func createQuotation(
+    sessionToken : Text,
+    leadId       : Text,
+    data         : QuotationInput
+  ) : async { #ok : Quotation; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (not canAssignLeads(caller.role)) {
+      return #err("Unauthorized: only admin and backoffice can create quotations");
+    };
+    let qNum = nextQuotationNumber();
+    let qId  = qNum; // quotation number doubles as unique id
+    let (sub, gst, total) = computeTotals(data.items, data.gstPercent);
+    let q : Quotation = {
+      id              = qId;
+      leadId;
+      quotationNumber = qNum;
+      createdAt       = Time.now();
+      updatedAt       = Time.now();
+      createdBy       = caller.userId;
+      customerName    = data.customerName;
+      customerAddress = data.customerAddress;
+      systemType      = data.systemType;
+      panelCapacity   = data.panelCapacity;
+      items           = data.items;
+      subtotal        = sub;
+      gstPercent      = data.gstPercent;
+      gstAmount       = gst;
+      totalAmount     = total;
+      notes           = data.notes;
+      validityDays    = data.validityDays;
+      status          = #draft;
+    };
+    quotations.add(qId, q);
+    #ok(q);
+  };
+
+  public shared func updateQuotation(
+    sessionToken : Text,
+    id           : Text,
+    data         : QuotationInput
+  ) : async { #ok : Quotation; #err : Text } {
+    let caller = requireSession(sessionToken);
+    switch (quotations.get(id)) {
+      case null { #err("Quotation not found") };
+      case (?existing) {
+        // Admin, backoffice, or the original creator can update
+        if (caller.role != #admin and caller.role != #backoffice and caller.userId != existing.createdBy) {
+          return #err("Unauthorized: you cannot update this quotation");
+        };
+        let (sub, gst, total) = computeTotals(data.items, data.gstPercent);
+        let updated : Quotation = {
+          existing with
+          updatedAt       = Time.now();
+          customerName    = data.customerName;
+          customerAddress = data.customerAddress;
+          systemType      = data.systemType;
+          panelCapacity   = data.panelCapacity;
+          items           = data.items;
+          subtotal        = sub;
+          gstPercent      = data.gstPercent;
+          gstAmount       = gst;
+          totalAmount     = total;
+          notes           = data.notes;
+          validityDays    = data.validityDays;
+        };
+        quotations.add(id, updated);
+        #ok(updated);
+      };
+    };
+  };
+
+  public query func getQuotationsByLead(sessionToken : Text, leadId : Text) : async { #ok : [Quotation]; #err : Text } {
+    ignore requireSession(sessionToken);
+    #ok(quotations.values().toArray().filter(func(q : Quotation) : Bool { Text.equal(q.leadId, leadId) }));
+  };
+
+  public query func getQuotationById(sessionToken : Text, id : Text) : async { #ok : ?Quotation; #err : Text } {
+    ignore requireSession(sessionToken);
+    #ok(quotations.get(id));
+  };
+
+  public shared func updateQuotationStatus(
+    sessionToken : Text,
+    id           : Text,
+    status       : QuotationStatus
+  ) : async { #ok : Quotation; #err : Text } {
+    let caller = requireSession(sessionToken);
+    switch (quotations.get(id)) {
+      case null { #err("Quotation not found") };
+      case (?existing) {
+        if (caller.role != #admin and caller.role != #backoffice and caller.userId != existing.createdBy) {
+          return #err("Unauthorized: you cannot update this quotation's status");
+        };
+        let updated : Quotation = {
+          existing with status; updatedAt = Time.now();
+        };
+        quotations.add(id, updated);
+        #ok(updated);
+      };
+    };
+  };
+
+  public query func getAllQuotations(sessionToken : Text) : async { #ok : [Quotation]; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (not canViewAllLeads(caller.role)) {
+      return #err("Unauthorized: admin, backoffice, or operation access required");
+    };
+    #ok(quotations.values().toArray());
+  };
+
+  // ─────────────────────────────────────────────
+  //  DELETION (admin only)
+  // ─────────────────────────────────────────────
+
+  public shared func deleteLead(
+    sessionToken : Text,
+    leadId       : Nat
+  ) : async { #ok : Text; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (caller.role != #admin) {
+      return #err("Unauthorized: only admin can delete leads");
+    };
+    switch (leads.get(leadId)) {
+      case null { #err("Lead not found") };
+      case (?existing) {
+        // Hard-delete the lead
+        leads.remove(leadId);
+        // Hard-delete all quotations associated with this lead
+        let leadIdText = leadId.toText();
+        let toDelete = quotations.values().toArray().filter(
+          func(q : Quotation) : Bool { Text.equal(q.leadId, leadIdText) }
+        );
+        for (q in toDelete.values()) {
+          quotations.remove(q.id);
+        };
+        #ok("Lead and associated quotations deleted successfully");
+      };
+    };
+  };
+
+  public shared func deleteUser(
+    sessionToken : Text,
+    userId       : Text
+  ) : async { #ok : Text; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (caller.role != #admin) {
+      return #err("Unauthorized: only admin can delete users");
+    };
+    switch (users.get(userId)) {
+      case null { #err("User not found") };
+      case (?target) {
+        // Prevent deleting the last admin account
+        if (target.role == #admin) {
+          let adminCount = users.values().toArray().filter(
+            func(u : UserProfile) : Bool { u.role == #admin }
+          ).size();
+          if (adminCount <= 1) {
+            return #err("Cannot delete the last admin account");
+          };
+        };
+        users.remove(userId);
+        #ok("User deleted successfully");
+      };
+    };
   };
 
 };

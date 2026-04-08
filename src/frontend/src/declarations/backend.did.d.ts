@@ -33,6 +33,46 @@ export type PipelineStage = { 'closedWon' : null } |
   { 'surveyScheduled' : null } |
   { 'installation' : null } |
   { 'closedLost' : null };
+export interface Quotation {
+  'id' : string,
+  'customerName' : string,
+  'status' : QuotationStatus,
+  'panelCapacity' : number,
+  'createdAt' : Time,
+  'createdBy' : string,
+  'gstPercent' : number,
+  'validityDays' : bigint,
+  'gstAmount' : number,
+  'updatedAt' : Time,
+  'customerAddress' : string,
+  'leadId' : string,
+  'totalAmount' : number,
+  'notes' : string,
+  'quotationNumber' : string,
+  'items' : Array<QuotationItem>,
+  'subtotal' : number,
+  'systemType' : string,
+}
+export interface QuotationInput {
+  'customerName' : string,
+  'panelCapacity' : number,
+  'gstPercent' : number,
+  'validityDays' : bigint,
+  'customerAddress' : string,
+  'notes' : string,
+  'items' : Array<QuotationItem>,
+  'systemType' : string,
+}
+export interface QuotationItem {
+  'description' : string,
+  'itemName' : string,
+  'quantity' : number,
+  'unitPrice' : number,
+}
+export type QuotationStatus = { 'sent' : null } |
+  { 'rejected' : null } |
+  { 'accepted' : null } |
+  { 'draft' : null };
 export interface Remark {
   'content' : string,
   'addedAt' : Time,
@@ -65,11 +105,6 @@ export type UserRole__1 = { 'admin' : null } |
   { 'guest' : null };
 export interface _SERVICE {
   '_initializeAccessControl' : ActorMethod<[], undefined>,
-  'addDistrict' : ActorMethod<
-    [string, string],
-    { 'ok' : null } |
-      { 'err' : string }
-  >,
   'addLead' : ActorMethod<
     [string, string, string, string, string, string, Requirement, string],
     { 'ok' : Lead } |
@@ -96,15 +131,35 @@ export interface _SERVICE {
     { 'ok' : null } |
       { 'err' : string }
   >,
+  'createQuotation' : ActorMethod<
+    [string, string, QuotationInput],
+    { 'ok' : Quotation } |
+      { 'err' : string }
+  >,
   'createUser' : ActorMethod<
     [string, string, string, string, UserRole, string, string, string, string],
     { 'ok' : null } |
+      { 'err' : string }
+  >,
+  'deleteLead' : ActorMethod<
+    [string, bigint],
+    { 'ok' : string } |
+      { 'err' : string }
+  >,
+  'deleteUser' : ActorMethod<
+    [string, string],
+    { 'ok' : string } |
       { 'err' : string }
   >,
   'getAllDistricts' : ActorMethod<[], Array<string>>,
   'getAllLeads' : ActorMethod<
     [string],
     { 'ok' : Array<Lead> } |
+      { 'err' : string }
+  >,
+  'getAllQuotations' : ActorMethod<
+    [string],
+    { 'ok' : Array<Quotation> } |
       { 'err' : string }
   >,
   'getAllUsers' : ActorMethod<
@@ -153,6 +208,16 @@ export interface _SERVICE {
     { 'ok' : UserProfile } |
       { 'err' : string }
   >,
+  'getQuotationById' : ActorMethod<
+    [string, string],
+    { 'ok' : [] | [Quotation] } |
+      { 'err' : string }
+  >,
+  'getQuotationsByLead' : ActorMethod<
+    [string, string],
+    { 'ok' : Array<Quotation> } |
+      { 'err' : string }
+  >,
   'getTotalLeadsCount' : ActorMethod<
     [string],
     { 'ok' : bigint } |
@@ -170,6 +235,7 @@ export interface _SERVICE {
       { 'err' : string }
   >,
   'logout' : ActorMethod<[string], undefined>,
+  'seedDistricts' : ActorMethod<[], Array<string>>,
   'updateLead' : ActorMethod<
     [
       string,
@@ -188,6 +254,16 @@ export interface _SERVICE {
   'updateLeadStage' : ActorMethod<
     [string, bigint, PipelineStage, string],
     { 'ok' : Lead } |
+      { 'err' : string }
+  >,
+  'updateQuotation' : ActorMethod<
+    [string, string, QuotationInput],
+    { 'ok' : Quotation } |
+      { 'err' : string }
+  >,
+  'updateQuotationStatus' : ActorMethod<
+    [string, string, QuotationStatus],
+    { 'ok' : Quotation } |
       { 'err' : string }
   >,
   'updateUser' : ActorMethod<

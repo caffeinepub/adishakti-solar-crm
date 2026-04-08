@@ -151,3 +151,86 @@ export function formatCurrency(value: bigint): string {
   if (num >= 1_000) return `₹${(num / 1_000).toFixed(0)}K`;
   return `₹${num}`;
 }
+
+export function formatCurrencyNum(value: number): string {
+  if (value >= 10_000_000) return `₹${(value / 10_000_000).toFixed(2)}Cr`;
+  if (value >= 100_000) return `₹${(value / 100_000).toFixed(2)}L`;
+  if (value >= 1_000) return `₹${(value / 1_000).toFixed(0)}K`;
+  return `₹${value.toFixed(0)}`;
+}
+
+// ── Quotation types ────────────────────────────────────────────────────────
+
+export interface QuotationItem {
+  itemName: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+export type QuotationStatus = "draft" | "sent" | "accepted" | "rejected";
+
+export interface Quotation {
+  id: string;
+  leadId: string;
+  quotationNumber: string;
+  createdAt: bigint;
+  updatedAt: bigint;
+  createdBy: string;
+  customerName: string;
+  customerAddress: string;
+  systemType: string;
+  panelCapacity: number;
+  items: QuotationItem[];
+  subtotal: number;
+  gstPercent: number;
+  gstAmount: number;
+  totalAmount: number;
+  notes: string;
+  validityDays: number;
+  status: QuotationStatus;
+}
+
+export interface QuotationInput {
+  customerName: string;
+  customerAddress: string;
+  systemType: string;
+  panelCapacity: number;
+  items: QuotationItem[];
+  gstPercent: number;
+  notes: string;
+  validityDays: number;
+}
+
+export const QUOTATION_STATUS_LABELS: Record<QuotationStatus, string> = {
+  draft: "Draft",
+  sent: "Sent",
+  accepted: "Accepted",
+  rejected: "Rejected",
+};
+
+export const QUOTATION_STATUS_COLORS: Record<
+  QuotationStatus,
+  { bg: string; text: string; border: string }
+> = {
+  draft: {
+    bg: "bg-muted",
+    text: "text-muted-foreground",
+    border: "border-border",
+  },
+  sent: {
+    bg: "bg-blue-900/40",
+    text: "text-blue-300",
+    border: "border-blue-700/50",
+  },
+  accepted: {
+    bg: "bg-green-900/40",
+    text: "text-green-300",
+    border: "border-green-700/50",
+  },
+  rejected: {
+    bg: "bg-red-900/40",
+    text: "text-red-300",
+    border: "border-red-700/50",
+  },
+};

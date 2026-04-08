@@ -50,6 +50,48 @@ export const UserRole__1 = IDL.Variant({
   'user' : IDL.Null,
   'guest' : IDL.Null,
 });
+export const QuotationItem = IDL.Record({
+  'description' : IDL.Text,
+  'itemName' : IDL.Text,
+  'quantity' : IDL.Float64,
+  'unitPrice' : IDL.Float64,
+});
+export const QuotationInput = IDL.Record({
+  'customerName' : IDL.Text,
+  'panelCapacity' : IDL.Float64,
+  'gstPercent' : IDL.Float64,
+  'validityDays' : IDL.Nat,
+  'customerAddress' : IDL.Text,
+  'notes' : IDL.Text,
+  'items' : IDL.Vec(QuotationItem),
+  'systemType' : IDL.Text,
+});
+export const QuotationStatus = IDL.Variant({
+  'sent' : IDL.Null,
+  'rejected' : IDL.Null,
+  'accepted' : IDL.Null,
+  'draft' : IDL.Null,
+});
+export const Quotation = IDL.Record({
+  'id' : IDL.Text,
+  'customerName' : IDL.Text,
+  'status' : QuotationStatus,
+  'panelCapacity' : IDL.Float64,
+  'createdAt' : Time,
+  'createdBy' : IDL.Text,
+  'gstPercent' : IDL.Float64,
+  'validityDays' : IDL.Nat,
+  'gstAmount' : IDL.Float64,
+  'updatedAt' : Time,
+  'customerAddress' : IDL.Text,
+  'leadId' : IDL.Text,
+  'totalAmount' : IDL.Float64,
+  'notes' : IDL.Text,
+  'quotationNumber' : IDL.Text,
+  'items' : IDL.Vec(QuotationItem),
+  'subtotal' : IDL.Float64,
+  'systemType' : IDL.Text,
+});
 export const UserRole = IDL.Variant({
   'admin' : IDL.Null,
   'backoffice' : IDL.Null,
@@ -70,11 +112,6 @@ export const UserProfile = IDL.Record({
 
 export const idlService = IDL.Service({
   '_initializeAccessControl' : IDL.Func([], [], []),
-  'addDistrict' : IDL.Func(
-      [IDL.Text, IDL.Text],
-      [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
-      [],
-    ),
   'addLead' : IDL.Func(
       [
         IDL.Text,
@@ -110,6 +147,11 @@ export const idlService = IDL.Service({
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
       [],
     ),
+  'createQuotation' : IDL.Func(
+      [IDL.Text, IDL.Text, QuotationInput],
+      [IDL.Variant({ 'ok' : Quotation, 'err' : IDL.Text })],
+      [],
+    ),
   'createUser' : IDL.Func(
       [
         IDL.Text,
@@ -125,10 +167,25 @@ export const idlService = IDL.Service({
       [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
       [],
     ),
+  'deleteLead' : IDL.Func(
+      [IDL.Text, IDL.Nat],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
+  'deleteUser' : IDL.Func(
+      [IDL.Text, IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+      [],
+    ),
   'getAllDistricts' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
   'getAllLeads' : IDL.Func(
       [IDL.Text],
       [IDL.Variant({ 'ok' : IDL.Vec(Lead), 'err' : IDL.Text })],
+      ['query'],
+    ),
+  'getAllQuotations' : IDL.Func(
+      [IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Vec(Quotation), 'err' : IDL.Text })],
       ['query'],
     ),
   'getAllUsers' : IDL.Func(
@@ -187,6 +244,16 @@ export const idlService = IDL.Service({
       [IDL.Variant({ 'ok' : UserProfile, 'err' : IDL.Text })],
       ['query'],
     ),
+  'getQuotationById' : IDL.Func(
+      [IDL.Text, IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Opt(Quotation), 'err' : IDL.Text })],
+      ['query'],
+    ),
+  'getQuotationsByLead' : IDL.Func(
+      [IDL.Text, IDL.Text],
+      [IDL.Variant({ 'ok' : IDL.Vec(Quotation), 'err' : IDL.Text })],
+      ['query'],
+    ),
   'getTotalLeadsCount' : IDL.Func(
       [IDL.Text],
       [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
@@ -204,6 +271,7 @@ export const idlService = IDL.Service({
       [],
     ),
   'logout' : IDL.Func([IDL.Text], [], []),
+  'seedDistricts' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
   'updateLead' : IDL.Func(
       [
         IDL.Text,
@@ -222,6 +290,16 @@ export const idlService = IDL.Service({
   'updateLeadStage' : IDL.Func(
       [IDL.Text, IDL.Nat, PipelineStage, IDL.Text],
       [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+      [],
+    ),
+  'updateQuotation' : IDL.Func(
+      [IDL.Text, IDL.Text, QuotationInput],
+      [IDL.Variant({ 'ok' : Quotation, 'err' : IDL.Text })],
+      [],
+    ),
+  'updateQuotationStatus' : IDL.Func(
+      [IDL.Text, IDL.Text, QuotationStatus],
+      [IDL.Variant({ 'ok' : Quotation, 'err' : IDL.Text })],
       [],
     ),
   'updateUser' : IDL.Func(
@@ -286,6 +364,48 @@ export const idlFactory = ({ IDL }) => {
     'user' : IDL.Null,
     'guest' : IDL.Null,
   });
+  const QuotationItem = IDL.Record({
+    'description' : IDL.Text,
+    'itemName' : IDL.Text,
+    'quantity' : IDL.Float64,
+    'unitPrice' : IDL.Float64,
+  });
+  const QuotationInput = IDL.Record({
+    'customerName' : IDL.Text,
+    'panelCapacity' : IDL.Float64,
+    'gstPercent' : IDL.Float64,
+    'validityDays' : IDL.Nat,
+    'customerAddress' : IDL.Text,
+    'notes' : IDL.Text,
+    'items' : IDL.Vec(QuotationItem),
+    'systemType' : IDL.Text,
+  });
+  const QuotationStatus = IDL.Variant({
+    'sent' : IDL.Null,
+    'rejected' : IDL.Null,
+    'accepted' : IDL.Null,
+    'draft' : IDL.Null,
+  });
+  const Quotation = IDL.Record({
+    'id' : IDL.Text,
+    'customerName' : IDL.Text,
+    'status' : QuotationStatus,
+    'panelCapacity' : IDL.Float64,
+    'createdAt' : Time,
+    'createdBy' : IDL.Text,
+    'gstPercent' : IDL.Float64,
+    'validityDays' : IDL.Nat,
+    'gstAmount' : IDL.Float64,
+    'updatedAt' : Time,
+    'customerAddress' : IDL.Text,
+    'leadId' : IDL.Text,
+    'totalAmount' : IDL.Float64,
+    'notes' : IDL.Text,
+    'quotationNumber' : IDL.Text,
+    'items' : IDL.Vec(QuotationItem),
+    'subtotal' : IDL.Float64,
+    'systemType' : IDL.Text,
+  });
   const UserRole = IDL.Variant({
     'admin' : IDL.Null,
     'backoffice' : IDL.Null,
@@ -306,11 +426,6 @@ export const idlFactory = ({ IDL }) => {
   
   return IDL.Service({
     '_initializeAccessControl' : IDL.Func([], [], []),
-    'addDistrict' : IDL.Func(
-        [IDL.Text, IDL.Text],
-        [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
-        [],
-      ),
     'addLead' : IDL.Func(
         [
           IDL.Text,
@@ -346,6 +461,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
         [],
       ),
+    'createQuotation' : IDL.Func(
+        [IDL.Text, IDL.Text, QuotationInput],
+        [IDL.Variant({ 'ok' : Quotation, 'err' : IDL.Text })],
+        [],
+      ),
     'createUser' : IDL.Func(
         [
           IDL.Text,
@@ -361,10 +481,25 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : IDL.Null, 'err' : IDL.Text })],
         [],
       ),
+    'deleteLead' : IDL.Func(
+        [IDL.Text, IDL.Nat],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
+    'deleteUser' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
     'getAllDistricts' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
     'getAllLeads' : IDL.Func(
         [IDL.Text],
         [IDL.Variant({ 'ok' : IDL.Vec(Lead), 'err' : IDL.Text })],
+        ['query'],
+      ),
+    'getAllQuotations' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Vec(Quotation), 'err' : IDL.Text })],
         ['query'],
       ),
     'getAllUsers' : IDL.Func(
@@ -423,6 +558,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : UserProfile, 'err' : IDL.Text })],
         ['query'],
       ),
+    'getQuotationById' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Opt(Quotation), 'err' : IDL.Text })],
+        ['query'],
+      ),
+    'getQuotationsByLead' : IDL.Func(
+        [IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Vec(Quotation), 'err' : IDL.Text })],
+        ['query'],
+      ),
     'getTotalLeadsCount' : IDL.Func(
         [IDL.Text],
         [IDL.Variant({ 'ok' : IDL.Nat, 'err' : IDL.Text })],
@@ -440,6 +585,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'logout' : IDL.Func([IDL.Text], [], []),
+    'seedDistricts' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
     'updateLead' : IDL.Func(
         [
           IDL.Text,
@@ -458,6 +604,16 @@ export const idlFactory = ({ IDL }) => {
     'updateLeadStage' : IDL.Func(
         [IDL.Text, IDL.Nat, PipelineStage, IDL.Text],
         [IDL.Variant({ 'ok' : Lead, 'err' : IDL.Text })],
+        [],
+      ),
+    'updateQuotation' : IDL.Func(
+        [IDL.Text, IDL.Text, QuotationInput],
+        [IDL.Variant({ 'ok' : Quotation, 'err' : IDL.Text })],
+        [],
+      ),
+    'updateQuotationStatus' : IDL.Func(
+        [IDL.Text, IDL.Text, QuotationStatus],
+        [IDL.Variant({ 'ok' : Quotation, 'err' : IDL.Text })],
         [],
       ),
     'updateUser' : IDL.Func(

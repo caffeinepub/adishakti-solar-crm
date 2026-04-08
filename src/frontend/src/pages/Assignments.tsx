@@ -14,7 +14,6 @@ import { Layout } from "../components/Layout";
 import { StageBadge } from "../components/StageBadge";
 import { useAuth } from "../hooks/useAuth";
 import {
-  useAllDistricts,
   useAllLeads,
   useAllUsers,
   useAssignLeadToOperations,
@@ -66,9 +65,23 @@ export default function Assignments() {
     lead: (typeof allLeads)[number],
     salesUser: (typeof salesUsers)[number],
   ) => {
-    const msg = `Lead Details: ${lead.customerName}, Phone: ${lead.phone}, District: ${lead.district}, Requirements: ${lead.requirements.systemType}, ${lead.requirements.panelSize}kW, Est. Value: ₹${lead.requirements.estimatedValue}`;
+    const lines = [
+      "🌞 *New Lead Assigned — Adishakti Solar*",
+      "",
+      `*Customer:* ${lead.customerName}`,
+      `*Phone:* ${lead.phone}`,
+      `*District:* ${lead.district}`,
+      `*System Type:* ${lead.requirements.systemType || "Not specified"}`,
+      `*Panel Size:* ${lead.requirements.panelSize || "Not specified"}`,
+      `*Est. Value:* ₹${Number(lead.requirements.estimatedValue).toLocaleString("en-IN")}`,
+      lead.requirements.notes ? `*Notes:* ${lead.requirements.notes}` : "",
+      "",
+      "Please schedule a site survey at the earliest. Thank you!",
+    ]
+      .filter((l) => l !== "")
+      .join("\n");
     const phone = salesUser.whatsAppNumber.replace(/\D/g, "");
-    return `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    return `https://wa.me/${phone}?text=${encodeURIComponent(lines)}`;
   };
 
   return (
