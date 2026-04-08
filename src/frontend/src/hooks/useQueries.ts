@@ -1,13 +1,14 @@
+import { useActor } from "@caffeineai/core-infrastructure";
 import type { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { District, Lead, UserApprovalInfo, UserProfile } from "../backend";
 import type { ApprovalStatus, PipelineStage } from "../backend";
-import { useActor } from "./useActor";
+import { createActor } from "../backend";
 
 // ── Leads ──────────────────────────────────────────────────────────────────
 
 export function useAllLeads() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Lead[]>({
     queryKey: ["leads"],
     queryFn: async () => {
@@ -19,7 +20,7 @@ export function useAllLeads() {
 }
 
 export function useLeadsByDistrict(district: District | null) {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Lead[]>({
     queryKey: ["leads", "district", district],
     queryFn: async () => {
@@ -31,7 +32,7 @@ export function useLeadsByDistrict(district: District | null) {
 }
 
 export function useTotalLeadsCount() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<bigint>({
     queryKey: ["leads", "total"],
     queryFn: async () => {
@@ -43,7 +44,7 @@ export function useTotalLeadsCount() {
 }
 
 export function useLeadsAddedToday() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<bigint>({
     queryKey: ["leads", "today"],
     queryFn: async () => {
@@ -55,7 +56,7 @@ export function useLeadsAddedToday() {
 }
 
 export function useLeadsByStageCount() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Array<[PipelineStage, bigint]>>({
     queryKey: ["leads", "stageCount"],
     queryFn: async () => {
@@ -67,7 +68,7 @@ export function useLeadsByStageCount() {
 }
 
 export function useMyLeads() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<Lead[]>({
     queryKey: ["leads", "mine"],
     queryFn: async () => {
@@ -81,7 +82,7 @@ export function useMyLeads() {
 // ── Lead Mutations ─────────────────────────────────────────────────────────
 
 export function useAddLead() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (lead: Lead) => {
@@ -95,7 +96,7 @@ export function useAddLead() {
 }
 
 export function useUpdateLead() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, lead }: { id: bigint; lead: Lead }) => {
@@ -109,7 +110,7 @@ export function useUpdateLead() {
 }
 
 export function useUpdateLeadStage() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -127,7 +128,7 @@ export function useUpdateLeadStage() {
 }
 
 export function useAssignLeadToSales() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -144,7 +145,7 @@ export function useAssignLeadToSales() {
 }
 
 export function useAssignLeadToOperations() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -163,7 +164,7 @@ export function useAssignLeadToOperations() {
 // ── Districts ──────────────────────────────────────────────────────────────
 
 export function useAllDistricts() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<District[]>({
     queryKey: ["districts"],
     queryFn: async () => {
@@ -175,7 +176,7 @@ export function useAllDistricts() {
 }
 
 export function useAddDistrict() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (district: string) => {
@@ -191,7 +192,7 @@ export function useAddDistrict() {
 // ── Users ──────────────────────────────────────────────────────────────────
 
 export function useAllUsers() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<UserProfile[]>({
     queryKey: ["users"],
     queryFn: async () => {
@@ -203,7 +204,7 @@ export function useAllUsers() {
 }
 
 export function useCallerProfile() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<UserProfile | null>({
     queryKey: ["callerProfile"],
     queryFn: async () => {
@@ -215,7 +216,7 @@ export function useCallerProfile() {
 }
 
 export function useIsAdmin() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<boolean>({
     queryKey: ["isAdmin"],
     queryFn: async () => {
@@ -227,7 +228,7 @@ export function useIsAdmin() {
 }
 
 export function useIsApproved() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<boolean>({
     queryKey: ["isApproved"],
     queryFn: async () => {
@@ -239,7 +240,7 @@ export function useIsApproved() {
 }
 
 export function useListApprovals() {
-  const { actor, isFetching } = useActor();
+  const { actor, isFetching } = useActor(createActor);
   return useQuery<UserApprovalInfo[]>({
     queryKey: ["approvals"],
     queryFn: async () => {
@@ -251,7 +252,7 @@ export function useListApprovals() {
 }
 
 export function useAddUserProfile() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
@@ -266,7 +267,7 @@ export function useAddUserProfile() {
 }
 
 export function useUpdateUserProfile() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
@@ -281,7 +282,7 @@ export function useUpdateUserProfile() {
 }
 
 export function useRequestApproval() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async () => {
@@ -296,7 +297,7 @@ export function useRequestApproval() {
 }
 
 export function useSetApproval() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -314,7 +315,7 @@ export function useSetApproval() {
 }
 
 export function useSeedDistricts() {
-  const { actor } = useActor();
+  const { actor } = useActor(createActor);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (districts: string[]) => {

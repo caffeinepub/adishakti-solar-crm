@@ -94,6 +94,7 @@ export interface backendInterface {
     isCallerApproved(): Promise<boolean>;
     listApprovals(): Promise<Array<UserApprovalInfo>>;
     requestApproval(): Promise<void>;
+    saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setApproval(user: Principal, status: ApprovalStatus): Promise<void>;
     updateLead(leadId: LeadId, input: Lead): Promise<void>;
     updateLeadStage(leadId: LeadId, stage: PipelineStage, notes: string): Promise<void>;

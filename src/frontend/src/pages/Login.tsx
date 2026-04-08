@@ -8,12 +8,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useInternetIdentity } from "@caffeineai/core-infrastructure";
 import { Clock, Loader2, Lock, Sun } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { UserRole } from "../backend";
-import { useActor } from "../hooks/useActor";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAddUserProfile,
   useAllDistricts,
@@ -26,11 +25,9 @@ import {
 import { DEFAULT_DISTRICTS, ROLE_LABELS } from "../types";
 
 export default function Login() {
-  const { login, isLoggingIn, isInitializing, identity } =
-    useInternetIdentity();
-  const { isFetching: actorLoading } = useActor();
-  const { data: profile, isLoading: profileLoading } = useCallerProfile();
-  const { data: isApproved, isLoading: approvedLoading } = useIsApproved();
+  const { login, isLoggingIn, identity } = useInternetIdentity();
+  const { data: profile } = useCallerProfile();
+  const { data: isApproved } = useIsApproved();
   const { data: isAdmin } = useIsAdmin();
   const { data: districts = [] } = useAllDistricts();
 
@@ -48,9 +45,6 @@ export default function Login() {
 
   const set = (field: string, value: string | UserRole) =>
     setForm((p) => ({ ...p, [field]: value }));
-
-  const loading =
-    isInitializing || actorLoading || profileLoading || approvedLoading;
 
   const handleProfileSetup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,22 +76,7 @@ export default function Login() {
     }
   };
 
-  if (loading) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{
-          background: "linear-gradient(135deg, #0A1220 0%, #0E1B2D 100%)",
-        }}
-      >
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-gold" />
-          <p className="text-muted-foreground text-sm">Initializing...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // Case 1: Not logged in — show login button
   if (!identity) {
     return (
       <div
@@ -105,6 +84,7 @@ export default function Login() {
         style={{
           background: "linear-gradient(135deg, #0A1220 0%, #0E1B2D 100%)",
         }}
+        data-ocid="login.page"
       >
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
@@ -155,6 +135,7 @@ export default function Login() {
     );
   }
 
+  // Case 2: Logged in but no profile — show setup form
   if (!profile) {
     const allDistricts = districts.length > 0 ? districts : DEFAULT_DISTRICTS;
     return (
@@ -163,14 +144,13 @@ export default function Login() {
         style={{
           background: "linear-gradient(135deg, #0A1220 0%, #0E1B2D 100%)",
         }}
+        data-ocid="profile.page"
       >
         <div className="w-full max-w-md">
           <div className="text-center mb-6">
-            <img
-              src="/assets/generated/solar-logo-transparent.dim_60x60.png"
-              alt="logo"
-              className="w-12 h-12 mx-auto mb-3 rounded-full"
-            />
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gold/20 border border-gold/30 mb-3">
+              <Sun className="w-6 h-6 text-gold" />
+            </div>
             <h1 className="text-xl font-extrabold text-foreground uppercase tracking-tight">
               Setup Your Profile
             </h1>
@@ -284,6 +264,7 @@ export default function Login() {
     );
   }
 
+  // Case 3: Profile exists but not yet approved
   if (!isAdmin && !isApproved) {
     return (
       <div
@@ -291,6 +272,7 @@ export default function Login() {
         style={{
           background: "linear-gradient(135deg, #0A1220 0%, #0E1B2D 100%)",
         }}
+        data-ocid="pending.page"
       >
         <div className="w-full max-w-sm text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-900/30 border border-amber-700/50 mb-4">
@@ -322,6 +304,7 @@ export default function Login() {
             size="sm"
             className="mt-4 border-border text-muted-foreground"
             onClick={() => window.location.reload()}
+            data-ocid="pending.reload.button"
           >
             Check Again
           </Button>

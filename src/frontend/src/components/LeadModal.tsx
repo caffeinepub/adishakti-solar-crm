@@ -15,13 +15,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useInternetIdentity } from "@caffeineai/core-infrastructure";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Lead, UserProfile } from "../backend";
 import { PipelineStage, UserRole } from "../backend";
 import type { District } from "../backend";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 interface LeadModalProps {
   open: boolean;

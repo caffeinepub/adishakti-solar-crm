@@ -1,3 +1,4 @@
+
 import Map "mo:core/Map";
 import List "mo:core/List";
 import Array "mo:core/Array";
@@ -8,9 +9,10 @@ import Order "mo:core/Order";
 import Time "mo:core/Time";
 import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
-import MixinAuthorization "authorization/MixinAuthorization";
-import AccessControl "authorization/access-control";
-import UserApproval "user-approval/approval";
+import MixinAuthorization "mo:caffeineai-authorization/MixinAuthorization";
+import AccessControl "mo:caffeineai-authorization/access-control";
+import UserApproval "mo:caffeineai-user-approval/approval";
+
 
 actor {
   // Initialize the access control system
@@ -52,7 +54,36 @@ actor {
 
   let districts = List.empty<District>();
   let defaultDistricts = [
-    "Ahmedabad", "Vadodara", "Surat", "Rajkot", "Gandhinagar", "Bhavnagar", "Jamnagar", "Junagadh", "Bharuch", "Gujarat_other"
+    "Angul",
+    "Balangir",
+    "Balasore",
+    "Bargarh",
+    "Bhadrak",
+    "Boudh",
+    "Cuttack",
+    "Deogarh",
+    "Dhenkanal",
+    "Gajapati",
+    "Ganjam",
+    "Jagatsinghpur",
+    "Jajpur",
+    "Jharsuguda",
+    "Kalahandi",
+    "Kandhamal",
+    "Kendrapara",
+    "Kendujhar",
+    "Khordha",
+    "Koraput",
+    "Malkangiri",
+    "Mayurbhanj",
+    "Nabarangpur",
+    "Nayagarh",
+    "Nuapada",
+    "Puri",
+    "Rayagada",
+    "Sambalpur",
+    "Subarnapur",
+    "Sundargarh"
   ];
 
   districts.addAll(defaultDistricts.values());
@@ -111,14 +142,30 @@ actor {
     isAdmin(caller) or isOperations(caller);
   };
 
+  // Helper function to validate user exists and has correct role
+  func validateUserRole(userId : Principal, expectedRole : UserRole) : Bool {
+    switch (userProfiles.get(userId)) {
+      case (?profile) { profile.role == expectedRole };
+      case null { false };
+    };
+  };
+
   public shared ({ caller }) func addUserProfile(profile : UserProfile) : async () {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can add profiles");
+    // Only admins can create user profiles directly
+    // Regular users must go through approval process and cannot set their own role
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can create user profiles");
     };
+    
+    // Verify the profile is for an approved user or admin is creating it
+    if (not (UserApproval.isApproved(approvalState, profile.principal) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Can only create profiles for approved users");
+    };
+
     let newProfile : UserProfile = {
-      profile with principal = caller
+      profile with principal = profile.principal
     };
-    userProfiles.add(caller, newProfile);
+    userProfiles.add(profile.principal, newProfile);
   };
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
@@ -142,9 +189,25 @@ actor {
     if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only approved and authenticated users can update profiles");
     };
-    if (not (userProfiles.containsKey(caller))) {
-      Runtime.trap("Unauthorized: Profile does not exist. Please add a profile first.");
+    
+    // Get existing profile
+    let existingProfile = switch (userProfiles.get(caller)) {
+      case (?p) { p };
+      case null {
+        Runtime.trap("Unauthorized: Profile does not exist. Please contact admin to create a profile.");
+      };
     };
+
+    // Users cannot change their own role - only admins can do that
+    if (profile.role != existingProfile.role and not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can change user roles");
+    };
+
+    // Users can only update their own profile unless they are admin
+    if (caller != profile.principal and not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Can only update your own profile unless you are an admin");
+    };
+
     let updatedProfile : UserProfile = {
       profile with principal = caller
     };
@@ -234,6 +297,25 @@ actor {
       Runtime.trap("Unauthorized: Only sales staff, operations, or admins can add leads");
     };
 
+    // Validate assigned users if provided
+    switch (input.assignedSalesPerson) {
+      case (?salesPerson) {
+        if (not validateUserRole(salesPerson, #sales)) {
+          Runtime.trap("Invalid assignment: Assigned sales person must have sales role");
+        };
+      };
+      case null {};
+    };
+
+    switch (input.assignedOperationsPerson) {
+      case (?operationsPerson) {
+        if (not validateUserRole(operationsPerson, #operations)) {
+          Runtime.trap("Invalid assignment: Assigned operations person must have operations role");
+        };
+      };
+      case null {};
+    };
+
     let leadId = nextLeadId;
     nextLeadId += 1;
 
@@ -266,6 +348,25 @@ actor {
       case (?existingLead) {
         if (not canModifyLead(caller, existingLead)) {
           Runtime.trap("Unauthorized: You can only update your own leads or you must be an admin/operations");
+        };
+
+        // Validate assigned users if provided
+        switch (input.assignedSalesPerson) {
+          case (?salesPerson) {
+            if (not validateUserRole(salesPerson, #sales)) {
+              Runtime.trap("Invalid assignment: Assigned sales person must have sales role");
+            };
+          };
+          case null {};
+        };
+
+        switch (input.assignedOperationsPerson) {
+          case (?operationsPerson) {
+            if (not validateUserRole(operationsPerson, #operations)) {
+              Runtime.trap("Invalid assignment: Assigned operations person must have operations role");
+            };
+          };
+          case null {};
         };
 
         let updatedLead : Lead = {
@@ -316,6 +417,11 @@ actor {
       Runtime.trap("Unauthorized: Only operations staff or admins can assign leads");
     };
 
+    // Validate that the sales person has the sales role
+    if (not validateUserRole(salesPerson, #sales)) {
+      Runtime.trap("Invalid assignment: User must have sales role");
+    };
+
     switch (leads.get(leadId)) {
       case null {
         Runtime.trap("Lead not found");
@@ -339,6 +445,11 @@ actor {
     // Only operations and admin can assign leads
     if (not isAdminOrOperations(caller)) {
       Runtime.trap("Unauthorized: Only operations staff or admins can assign leads");
+    };
+
+    // Validate that the operations person has the operations role
+    if (not validateUserRole(operationsPerson, #operations)) {
+      Runtime.trap("Invalid assignment: User must have operations role");
     };
 
     switch (leads.get(leadId)) {
@@ -496,10 +607,7 @@ actor {
 
   // Admin-only: Get all user profiles
   public query ({ caller }) func getAllUserProfiles() : async [UserProfile] {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can view user profiles");
-    };
-    if (not isAdmin(caller)) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only admins can view all user profiles");
     };
 
@@ -508,10 +616,7 @@ actor {
 
   // Admin-only: Manage districts
   public shared ({ caller }) func addDistrict(district : District) : async () {
-    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
-      Runtime.trap("Unauthorized: Only approved and authenticated users can manage districts");
-    };
-    if (not isAdmin(caller)) {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
       Runtime.trap("Unauthorized: Only admins can add districts");
     };
 
@@ -524,5 +629,33 @@ actor {
     };
 
     districts.toArray();
+  };
+
+  // Required by frontend: saveCallerUserProfile
+  public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
+    // This is an alias for updateUserProfile but ensures the profile is for the caller
+    if (not (UserApproval.isApproved(approvalState, caller) or AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only approved and authenticated users can save profiles");
+    };
+    
+    // Get existing profile
+    let existingProfile = switch (userProfiles.get(caller)) {
+      case (?p) { p };
+      case null {
+        Runtime.trap("Unauthorized: Profile does not exist. Please contact admin to create a profile.");
+      };
+    };
+
+    // Users cannot change their own role
+    if (profile.role != existingProfile.role) {
+      Runtime.trap("Unauthorized: Cannot change your own role");
+    };
+
+    let updatedProfile : UserProfile = {
+      profile with 
+      principal = caller;
+      role = existingProfile.role; // Ensure role cannot be changed
+    };
+    userProfiles.add(caller, updatedProfile);
   };
 };

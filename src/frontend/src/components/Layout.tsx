@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { useInternetIdentity } from "@caffeineai/core-infrastructure";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   BarChart2,
@@ -28,7 +29,6 @@ import {
   Zap,
 } from "lucide-react";
 import { useState } from "react";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAllDistricts,
   useCallerProfile,

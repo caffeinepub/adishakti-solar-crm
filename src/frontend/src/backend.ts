@@ -151,7 +151,7 @@ export enum UserRole__1 {
     guest = "guest"
 }
 export interface backendInterface {
-    _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
+    _initializeAccessControl(): Promise<void>;
     addDistrict(district: District): Promise<void>;
     addLead(input: Lead): Promise<LeadId>;
     addUserProfile(profile: UserProfile): Promise<void>;
@@ -177,6 +177,7 @@ export interface backendInterface {
     isCallerApproved(): Promise<boolean>;
     listApprovals(): Promise<Array<UserApprovalInfo>>;
     requestApproval(): Promise<void>;
+    saveCallerUserProfile(profile: UserProfile): Promise<void>;
     setApproval(user: Principal, status: ApprovalStatus): Promise<void>;
     updateLead(leadId: LeadId, input: Lead): Promise<void>;
     updateLeadStage(leadId: LeadId, stage: PipelineStage, notes: string): Promise<void>;
@@ -185,17 +186,17 @@ export interface backendInterface {
 import type { ApprovalStatus as _ApprovalStatus, District as _District, Lead as _Lead, LeadId as _LeadId, PipelineStage as _PipelineStage, Requirement as _Requirement, Time as _Time, UserApprovalInfo as _UserApprovalInfo, UserId as _UserId, UserProfile as _UserProfile, UserRole as _UserRole, UserRole__1 as _UserRole__1 } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
-    async _initializeAccessControlWithSecret(arg0: string): Promise<void> {
+    async _initializeAccessControl(): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor._initializeAccessControlWithSecret(arg0);
+                const result = await this.actor._initializeAccessControl();
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor._initializeAccessControlWithSecret(arg0);
+            const result = await this.actor._initializeAccessControl();
             return result;
         }
     }
@@ -546,6 +547,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.requestApproval();
+            return result;
+        }
+    }
+    async saveCallerUserProfile(arg0: UserProfile): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n5(this._uploadFile, this._downloadFile, arg0));
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n5(this._uploadFile, this._downloadFile, arg0));
             return result;
         }
     }

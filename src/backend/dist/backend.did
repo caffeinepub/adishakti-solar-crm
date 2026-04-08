@@ -1,0 +1,108 @@
+type UserRole__1 = 
+ variant {
+   admin;
+   guest;
+   user;
+ };
+type UserRole = 
+ variant {
+   admin;
+   operations;
+   sales;
+ };
+type UserProfile = 
+ record {
+   district: District;
+   email: text;
+   name: text;
+   phone: text;
+   "principal": UserId;
+   role: UserRole;
+ };
+type UserId = principal;
+type UserApprovalInfo = 
+ record {
+   "principal": principal;
+   status: ApprovalStatus;
+ };
+type Time = int;
+type Requirement = 
+ record {
+   estimatedValue: nat;
+   notes: text;
+   panelSize: text;
+   systemType: text;
+ };
+type PipelineStage = 
+ variant {
+   bookingConfirmed;
+   closedLost;
+   closedWon;
+   inquiry;
+   installation;
+   surveyScheduled;
+ };
+type LeadId = nat;
+type Lead = 
+ record {
+   address: text;
+   assignedOperationsPerson: opt UserId;
+   assignedSalesPerson: opt UserId;
+   createdAt: Time;
+   createdBy: UserId;
+   customerName: text;
+   district: District;
+   email: text;
+   id: LeadId;
+   notes: text;
+   phone: text;
+   requirements: Requirement;
+   stage: PipelineStage;
+   updatedAt: Time;
+ };
+type District = text;
+type ApprovalStatus = 
+ variant {
+   approved;
+   pending;
+   rejected;
+ };
+service : {
+  _initializeAccessControl: () -> ();
+  addDistrict: (district: District) -> ();
+  addLead: (input: Lead) -> (LeadId);
+  addUserProfile: (profile: UserProfile) -> ();
+  assignCallerUserRole: (user: principal, role: UserRole__1) -> ();
+  assignLeadToOperations: (leadId: LeadId, operationsPerson: UserId) -> ();
+  assignLeadToSales: (leadId: LeadId, salesPerson: UserId) -> ();
+  getAllDistricts: () -> (vec District) query;
+  getAllLeads: () -> (vec Lead) query;
+  getAllUserProfiles: () -> (vec UserProfile) query;
+  getCallerUserProfile: () -> (opt UserProfile) query;
+  getCallerUserRole: () -> (UserRole__1) query;
+  getLeadById: (leadId: LeadId) -> (opt Lead) query;
+  getLeadsAddedToday: () -> (nat) query;
+  getLeadsByDistrict: (district: District) -> (vec Lead) query;
+  getLeadsByDistrictCount: () -> (vec record {
+                                        District;
+                                        nat;
+                                      }) query;
+  getLeadsBySalesPerson: (salesPerson: UserId) -> (vec Lead) query;
+  getLeadsByStage: (stage: PipelineStage) -> (vec Lead) query;
+  getLeadsByStageCount: () -> (vec record {
+                                     PipelineStage;
+                                     nat;
+                                   }) query;
+  getMyLeads: () -> (vec Lead) query;
+  getTotalLeadsCount: () -> (nat) query;
+  getUserProfile: (user: principal) -> (opt UserProfile) query;
+  isCallerAdmin: () -> (bool) query;
+  isCallerApproved: () -> (bool) query;
+  listApprovals: () -> (vec UserApprovalInfo) query;
+  requestApproval: () -> ();
+  saveCallerUserProfile: (profile: UserProfile) -> ();
+  setApproval: (user: principal, status: ApprovalStatus) -> ();
+  updateLead: (leadId: LeadId, input: Lead) -> ();
+  updateLeadStage: (leadId: LeadId, stage: PipelineStage, notes: text) -> ();
+  updateUserProfile: (profile: UserProfile) -> ();
+}

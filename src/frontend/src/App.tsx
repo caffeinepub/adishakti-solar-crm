@@ -1,4 +1,5 @@
 import { Toaster } from "@/components/ui/sonner";
+import { useActor, useInternetIdentity } from "@caffeineai/core-infrastructure";
 import {
   Outlet,
   RouterProvider,
@@ -6,9 +7,9 @@ import {
   createRoute,
   createRouter,
 } from "@tanstack/react-router";
-import { Loader2 } from "lucide-react";
-import { useActor } from "./hooks/useActor";
-import { useInternetIdentity } from "./hooks/useInternetIdentity";
+import { Sun } from "lucide-react";
+import { useEffect, useState } from "react";
+import { createActor } from "./backend";
 import {
   useCallerProfile,
   useIsAdmin,
@@ -22,35 +23,76 @@ import Pipeline from "./pages/Pipeline";
 import Reports from "./pages/Reports";
 import UsersPage from "./pages/Users";
 
-// ── Auth gate wrapper ───────────────────────────────────────────────────────────
+// ── Loading Screen ──────────────────────────────────────────────────────────────
+
+function LoadingScreen() {
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center"
+      style={{
+        background: "linear-gradient(135deg, #0A1220 0%, #0E1B2D 100%)",
+      }}
+      data-ocid="app.loading_state"
+    >
+      <div className="flex flex-col items-center gap-4">
+        <div className="relative">
+          <div className="w-16 h-16 rounded-full bg-gold/10 border border-gold/20 flex items-center justify-center">
+            <Sun className="w-8 h-8 text-gold animate-pulse" />
+          </div>
+          <div className="absolute inset-0 rounded-full border-2 border-gold/30 border-t-gold animate-spin" />
+        </div>
+        <div className="text-center">
+          <p className="text-foreground font-bold text-sm tracking-widest uppercase">
+            Adishakti Solar CRM
+          </p>
+          <p className="text-muted-foreground text-xs mt-1">Loading...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Auth Gate ───────────────────────────────────────────────────────────────────
+// Key fix: only block on identity initialization + actor creation.
+// Profile / approval loading happens inside Login, not here.
 
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { identity, isInitializing } = useInternetIdentity();
-  const { isFetching: actorLoading } = useActor();
+  const { isFetching: actorLoading } = useActor(createActor);
+
+  // Once we have an actor (anonymous or authenticated), fetch profile & admin
   const { data: profile, isLoading: profileLoading } = useCallerProfile();
+  const { data: isAdmin, isLoading: adminLoading } = useIsAdmin();
   const { data: isApproved, isLoading: approvedLoading } = useIsApproved();
-  const { data: isAdmin } = useIsAdmin();
 
-  const loading =
-    isInitializing || actorLoading || profileLoading || approvedLoading;
+  // Timeout fallback: never stay in loading forever
+  const [timedOut, setTimedOut] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setTimedOut(true), 8000);
+    return () => clearTimeout(t);
+  }, []);
 
-  if (loading) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{
-          background: "linear-gradient(135deg, #0A1220 0%, #0E1B2D 100%)",
-        }}
-      >
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-gold" />
-          <p className="text-muted-foreground text-sm">Loading CRM...</p>
-        </div>
-      </div>
-    );
+  // Phase 1: Wait for identity system to initialize
+  if (isInitializing && !timedOut) {
+    return <LoadingScreen />;
   }
 
-  if (!identity || !profile || (!isAdmin && !isApproved)) {
+  // Phase 2: If not logged in, go straight to login (no need to wait for actor)
+  if (!identity) {
+    return <Login />;
+  }
+
+  // Phase 3: Identity exists — wait for actor + profile checks, but cap at timeout
+  const profileChecksLoading =
+    actorLoading || profileLoading || adminLoading || approvedLoading;
+  if (profileChecksLoading && !timedOut) {
+    return <LoadingScreen />;
+  }
+
+  // Phase 4: Profile missing → new user setup
+  // Phase 5: Not approved → pending screen
+  // Both handled in Login component
+  if (!profile || (!isAdmin && !isApproved)) {
     return <Login />;
   }
 

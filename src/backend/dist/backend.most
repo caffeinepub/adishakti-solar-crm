@@ -1,0 +1,91 @@
+// Version: 1.0.0
+type ApprovalStatus__575141016 = {#approved; #pending; #rejected};
+type Data__791452850<K, V> =
+  {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type District__456344483 = Text;
+type Int__270357528 = Int__616954475;
+type Int__616954475 = Int;
+type Internal__8484328<K, V> =
+  {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
+type LeadId__692235903 = Nat;
+type Lead__21276013 =
+  {
+    address : Text;
+    assignedOperationsPerson : ?UserId__313180070;
+    assignedSalesPerson : ?UserId__313180070;
+    createdAt : Time__900049286;
+    createdBy : UserId__313180070;
+    customerName : Text;
+    district : District__456344483;
+    email : Text;
+    id : LeadId__692235903;
+    notes : Text;
+    phone : Text;
+    requirements : Requirement__404759958;
+    stage : PipelineStage__644919044;
+    updatedAt : Time__900049286
+  };
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type Map__158565046<K, V> = Map__297112838<K, V>;
+type Map__297112838<K, V> =
+  {var root : Node__46230540<K, V>; var size : Nat__490723111};
+type Map__605269027<K, V> = Map__158565046<K, V>;
+type Nat__490723111 = Nat__920180692;
+type Nat__920180692 = Nat;
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type PipelineStage__644919044 =
+  {
+    #bookingConfirmed;
+    #closedLost;
+    #closedWon;
+    #inquiry;
+    #installation;
+    #surveyScheduled
+  };
+type Requirement__404759958 =
+  {estimatedValue : Nat; notes : Text; panelSize : Text; systemType : Text};
+type Time__796480547 = Int__270357528;
+type Time__900049286 = Time__796480547;
+type UserId__313180070 = Principal;
+type UserProfile__491224006 =
+  {
+    district : District__456344483;
+    email : Text;
+    name : Text;
+    phone : Text;
+    principal : UserId__313180070;
+    role : UserRole__599675725
+  };
+type UserRole__1054455867 = {#admin; #guest; #user};
+type UserRole__599675725 = {#admin; #operations; #sales};
+actor {
+  stable accessControlState :
+    {
+      var adminAssigned : Bool;
+      userRoles : Map__605269027<Principal, UserRole__1054455867>
+    };
+  stable approvalState :
+    {
+      var approvalStatus :
+        Map__605269027<Principal, ApprovalStatus__575141016>
+    };
+  stable defaultDistricts : [Text];
+  stable districts :
+    {
+      var blockIndex : Nat__490723111;
+      var blocks : [var [var ?District__456344483]];
+      var elementIndex : Nat__490723111
+    };
+  stable leads :
+    {
+      var root : Node__46230540<LeadId__692235903, Lead__21276013>;
+      var size : Nat__490723111
+    };
+  stable var nextLeadId : Nat;
+  stable userProfiles :
+    {
+      var root : Node__46230540<Principal, UserProfile__491224006>;
+      var size : Nat__490723111
+    }
+};

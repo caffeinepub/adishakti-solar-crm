@@ -71,7 +71,7 @@ export const UserApprovalInfo = IDL.Record({
 });
 
 export const idlService = IDL.Service({
-  '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+  '_initializeAccessControl' : IDL.Func([], [], []),
   'addDistrict' : IDL.Func([District], [], []),
   'addLead' : IDL.Func([Lead], [LeadId], []),
   'addUserProfile' : IDL.Func([UserProfile], [], []),
@@ -109,6 +109,7 @@ export const idlService = IDL.Service({
   'isCallerApproved' : IDL.Func([], [IDL.Bool], ['query']),
   'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
   'requestApproval' : IDL.Func([], [], []),
+  'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
   'updateLead' : IDL.Func([LeadId, Lead], [], []),
   'updateLeadStage' : IDL.Func([LeadId, PipelineStage, IDL.Text], [], []),
@@ -181,7 +182,7 @@ export const idlFactory = ({ IDL }) => {
   });
   
   return IDL.Service({
-    '_initializeAccessControlWithSecret' : IDL.Func([IDL.Text], [], []),
+    '_initializeAccessControl' : IDL.Func([], [], []),
     'addDistrict' : IDL.Func([District], [], []),
     'addLead' : IDL.Func([Lead], [LeadId], []),
     'addUserProfile' : IDL.Func([UserProfile], [], []),
@@ -219,6 +220,7 @@ export const idlFactory = ({ IDL }) => {
     'isCallerApproved' : IDL.Func([], [IDL.Bool], ['query']),
     'listApprovals' : IDL.Func([], [IDL.Vec(UserApprovalInfo)], ['query']),
     'requestApproval' : IDL.Func([], [], []),
+    'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'setApproval' : IDL.Func([IDL.Principal, ApprovalStatus], [], []),
     'updateLead' : IDL.Func([LeadId, Lead], [], []),
     'updateLeadStage' : IDL.Func([LeadId, PipelineStage, IDL.Text], [], []),

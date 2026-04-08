@@ -64,7 +64,7 @@ export type UserRole__1 = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
 export interface _SERVICE {
-  '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  '_initializeAccessControl' : ActorMethod<[], undefined>,
   'addDistrict' : ActorMethod<[District], undefined>,
   'addLead' : ActorMethod<[Lead], LeadId>,
   'addUserProfile' : ActorMethod<[UserProfile], undefined>,
@@ -90,6 +90,7 @@ export interface _SERVICE {
   'isCallerApproved' : ActorMethod<[], boolean>,
   'listApprovals' : ActorMethod<[], Array<UserApprovalInfo>>,
   'requestApproval' : ActorMethod<[], undefined>,
+  'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'setApproval' : ActorMethod<[Principal, ApprovalStatus], undefined>,
   'updateLead' : ActorMethod<[LeadId, Lead], undefined>,
   'updateLeadStage' : ActorMethod<[LeadId, PipelineStage, string], undefined>,
