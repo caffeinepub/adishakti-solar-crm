@@ -41,51 +41,13 @@ type OldPipelineStage__1069416066 =
     #installation;
     #surveyScheduled
   };
-type QuotationItem__901491219 =
-  {description : Text; itemName : Text; quantity : Float; unitPrice : Float};
-type QuotationStatus__427361237 = {#accepted; #draft; #rejected; #sent};
-type Quotation__900248815 =
-  {
-    createdAt : Time__900049286;
-    createdBy : Text;
-    customerAddress : Text;
-    customerName : Text;
-    gstAmount : Float;
-    gstPercent : Float;
-    id : Text;
-    items : [QuotationItem__901491219];
-    leadId : Text;
-    notes : Text;
-    panelCapacity : Float;
-    quotationNumber : Text;
-    status : QuotationStatus__427361237;
-    subtotal : Float;
-    systemType : Text;
-    totalAmount : Float;
-    updatedAt : Time__900049286;
-    validityDays : Nat
-  };
 type Remark__267946969 =
   {addedAt : Time__900049286; addedBy : Text; content : Text};
 type Requirement__404759958 =
   {estimatedValue : Nat; notes : Text; panelSize : Text; systemType : Text};
-type SessionData__547549588 = {createdAt : Time__900049286; userId : Text};
 type Time__796480547 = Int__270357528;
 type Time__900049286 = Time__796480547;
-type UserProfile__491224006 =
-  {
-    district : Text;
-    email : Text;
-    isActive : Bool;
-    name : Text;
-    passwordHash : Text;
-    phone : Text;
-    role : UserRole__599675725;
-    userId : Text;
-    whatsAppNumber : Text
-  };
 type UserRole__1054455867 = {#admin; #guest; #user};
-type UserRole__599675725 = {#admin; #backoffice; #operation; #sales};
 actor {
   stable accessControlState :
     {
@@ -98,22 +60,8 @@ actor {
       var size : Nat__490723111
     };
   stable var nextLeadId : Nat;
+  stable var nextQuotationRequestSeq : Nat;
   stable var nextQuotationSeq : Nat;
   stable odishaDistricts : [Text];
-  stable quotations :
-    {
-      var root : Node__46230540<Text, Quotation__900248815>;
-      var size : Nat__490723111
-    };
-  stable sessionTtlNanos : Int;
-  stable sessions :
-    {
-      var root : Node__46230540<Text, SessionData__547549588>;
-      var size : Nat__490723111
-    };
-  stable users :
-    {
-      var root : Node__46230540<Text, UserProfile__491224006>;
-      var size : Nat__490723111
-    }
+  stable sessionTtlNanos : Int
 };

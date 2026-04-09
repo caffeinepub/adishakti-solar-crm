@@ -48,6 +48,8 @@ interface LeadModalProps {
   salesUsers: UserProfile[];
   currentUserId: string;
   currentUserRole?: UserRole;
+  /** When true: sales staff is creating their own lead — assignee locked to self */
+  isSalesSelfCreate?: boolean;
   onDelete?: (lead: Lead) => void;
   onSubmit: (params: {
     customerName: string;
@@ -72,8 +74,11 @@ export function LeadModal({
   onClose,
   editLead,
   districts,
+  salesUsers,
+  currentUserId,
   onSubmit,
   currentUserRole,
+  isSalesSelfCreate = false,
   onDelete,
 }: LeadModalProps) {
   const [loading, setLoading] = useState(false);
@@ -96,6 +101,12 @@ export function LeadModal({
   const canManageQuotations =
     currentUserRole === UserRole.admin ||
     currentUserRole === UserRole.backoffice;
+
+  // When a sales staff member creates their own lead, find their display name
+  const selfUserName = isSalesSelfCreate
+    ? (salesUsers.find((u) => u.userId === currentUserId)?.name ??
+      currentUserId)
+    : null;
 
   const [form, setFormState] = useState({
     customerName: editLead?.customerName ?? "",
@@ -334,6 +345,26 @@ export function LeadModal({
                   </Select>
                 </div>
               </div>
+
+              {/* Sales self-create: show locked "Assigned To" field */}
+              {isSalesSelfCreate && selfUserName && (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-emerald-950/30 border border-emerald-700/40">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold mb-0.5">
+                      Assigned To (You)
+                    </p>
+                    <p className="text-sm font-semibold text-emerald-300">
+                      {selfUserName}{" "}
+                      <span className="text-[11px] font-mono text-muted-foreground">
+                        ({currentUserId})
+                      </span>
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-emerald-400/70 font-semibold bg-emerald-900/30 border border-emerald-700/40 px-2 py-0.5 rounded">
+                    Auto-assigned
+                  </span>
+                </div>
+              )}
 
               <div className="border-t border-border pt-3">
                 <p className="text-xs font-semibold text-gold uppercase mb-2">

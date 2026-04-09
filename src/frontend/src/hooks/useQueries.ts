@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   Lead,
   PipelineStage,
+  QuotationRequest,
   Requirement,
   UserProfile,
   UserRole,
@@ -560,6 +561,111 @@ export function useUpdateQuotationStatus() {
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ["quotations", vars.leadId] });
+    },
+  });
+}
+
+// ── Quotation Request Workflow ─────────────────────────────────────────────
+
+export function useRequestQuotation() {
+  const { actor } = useSafeActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { leadId: bigint; quotationRefId: string }) => {
+      if (!actor) throw new Error("Not connected");
+      const token = getToken();
+      const res = await actor.requestQuotation(
+        token,
+        params.leadId,
+        params.quotationRefId,
+      );
+      if (res.__kind__ === "err") throw new Error(res.err);
+      return res.ok;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["leads"] });
+      qc.invalidateQueries({ queryKey: ["quotationRequests"] });
+    },
+  });
+}
+
+export function useGetPendingQuotationRequests() {
+  const { actor, isFetching } = useSafeActor();
+  const token = getToken();
+  return useQuery<QuotationRequest[]>({
+    queryKey: ["quotationRequests", "pending"],
+    queryFn: async () => {
+      if (!actor || !token) return [];
+      const res = await actor.getPendingQuotationRequests(token);
+      return res.__kind__ === "ok" ? res.ok : [];
+    },
+    enabled: !!actor && !isFetching && !!token,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useGetAllQuotationRequests() {
+  const { actor, isFetching } = useSafeActor();
+  const token = getToken();
+  return useQuery<QuotationRequest[]>({
+    queryKey: ["quotationRequests", "all"],
+    queryFn: async () => {
+      if (!actor || !token) return [];
+      const res = await actor.getAllQuotationRequests(token);
+      return res.__kind__ === "ok" ? res.ok : [];
+    },
+    enabled: !!actor && !isFetching && !!token,
+  });
+}
+
+export function useConfirmQuotationRequest() {
+  const { actor } = useSafeActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (requestId: string) => {
+      if (!actor) throw new Error("Not connected");
+      const token = getToken();
+      const res = await actor.confirmQuotationRequest(token, requestId);
+      if (res.__kind__ === "err") throw new Error(res.err);
+      return res.ok;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["quotationRequests"] });
+      qc.invalidateQueries({ queryKey: ["leads"] });
+    },
+  });
+}
+
+// ── Sales Lead Generation Toggle ───────────────────────────────────────────
+
+export function useGetSalesLeadGenerationToggle() {
+  const { actor, isFetching } = useSafeActor();
+  const token = getToken();
+  return useQuery<boolean>({
+    queryKey: ["salesLeadGenerationToggle"],
+    queryFn: async () => {
+      if (!actor || !token) return false;
+      const res = await actor.getSalesLeadGenerationToggle(token);
+      return res.__kind__ === "ok" ? res.ok : false;
+    },
+    enabled: !!actor && !isFetching && !!token,
+    staleTime: 30_000,
+  });
+}
+
+export function useSetSalesLeadGenerationToggle() {
+  const { actor } = useSafeActor();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (enabled: boolean) => {
+      if (!actor) throw new Error("Not connected");
+      const token = getToken();
+      const res = await actor.setSalesLeadGenerationToggle(token, enabled);
+      if (res.__kind__ === "err") throw new Error(res.err);
+      return res.ok;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["salesLeadGenerationToggle"] });
     },
   });
 }

@@ -10,18 +10,22 @@ import {
   ChevronDown,
   ChevronUp,
   ClipboardPen,
+  Clock,
   Edit2,
   Eye,
   FileText,
   Loader2,
+  ThumbsDown,
+  ThumbsUp,
   TrendingUp,
+  UserPlus,
   Users,
   Zap,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { Lead } from "../backend";
-import { PipelineStage, UserRole } from "../backend";
+import type { Lead, QuotationRequest } from "../backend";
+import { PipelineStage, QuotationRequestStatus, UserRole } from "../backend";
 import { KPICard } from "../components/KPICard";
 import { Layout } from "../components/Layout";
 import { LeadCard } from "../components/LeadCard";
@@ -35,8 +39,12 @@ import {
   useAllDistricts,
   useAllLeads,
   useAllUsers,
+  useConfirmQuotationRequest,
+  useGetPendingQuotationRequests,
+  useGetSalesLeadGenerationToggle,
   useLeadsAddedToday,
   useMyLeads,
+  useRequestQuotation,
   useTotalLeadsCount,
   useUpdateLead,
   useUpdateLeadStage,
@@ -47,23 +55,196 @@ import {
   STAGE_LABELS,
   formatCurrency,
   formatDate,
+  formatDateTime,
 } from "../types";
+
+// ── Pending Quotation Requests Panel ──────────────────────────────────────────
+
+interface PendingQuotationPanelProps {
+  allLeads: Lead[];
+  allUsers: { userId: string; name: string }[];
+}
+
+function PendingQuotationPanel({
+  allLeads,
+  allUsers,
+}: PendingQuotationPanelProps) {
+  const { data: pendingRequests = [], isLoading } =
+    useGetPendingQuotationRequests();
+  const confirm = useConfirmQuotationRequest();
+
+  const getLeadName = (leadId: bigint) =>
+    allLeads.find((l) => l.id === leadId)?.customerName ?? "—";
+  const getLeadDistrict = (leadId: bigint) =>
+    allLeads.find((l) => l.id === leadId)?.district ?? "—";
+  const getSalesName = (userId: string) =>
+    allUsers.find((u) => u.userId === userId)?.name ?? userId;
+
+  const handleConfirm = async (req: QuotationRequest) => {
+    if (
+      !window.confirm(`Confirm quotation sent for ${getLeadName(req.leadId)}?`)
+    )
+      return;
+    try {
+      await confirm.mutateAsync(req.id);
+      toast.success("Quotation confirmed! Lead moved to Quotation Sent.");
+    } catch {
+      toast.error("Failed to confirm quotation.");
+    }
+  };
+
+  return (
+    <div
+      className="mb-6 rounded-lg border border-amber-700/50 bg-amber-950/20 overflow-hidden"
+      data-ocid="backoffice.pending_quotation_panel"
+    >
+      {/* Panel header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-amber-700/40 bg-amber-900/20">
+        <div className="flex items-center gap-2">
+          <FileText className="w-4 h-4 text-amber-400" />
+          <h2 className="text-sm font-bold uppercase tracking-widest text-amber-300">
+            Pending Quotation Requests
+          </h2>
+          {pendingRequests.length > 0 && (
+            <span
+              className="bg-amber-500 text-[#0A1220] text-[10px] font-extrabold px-2 py-0.5 rounded-full ml-1"
+              data-ocid="backoffice.pending_badge"
+            >
+              {pendingRequests.length}
+            </span>
+          )}
+        </div>
+        <span className="text-[10px] text-amber-400/70">
+          Auto-refreshes every 30s
+        </span>
+      </div>
+
+      {/* Panel body */}
+      <div className="p-4">
+        {isLoading ? (
+          <div className="flex flex-col gap-2">
+            {[1, 2].map((i) => (
+              <Skeleton key={i} className="h-14 w-full bg-amber-900/20" />
+            ))}
+          </div>
+        ) : pendingRequests.length === 0 ? (
+          <div
+            className="flex flex-col items-center py-6 gap-2 text-amber-400/60"
+            data-ocid="backoffice.pending_quotation_empty"
+          >
+            <CheckCircle2 className="w-8 h-8" />
+            <p className="text-sm font-medium">No pending quotation requests</p>
+            <p className="text-xs">
+              Sales staff quotation requests will appear here
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-amber-700/30">
+                  {[
+                    "Customer",
+                    "District",
+                    "Sales Person",
+                    "Quotation Ref ID",
+                    "Requested At",
+                    "Action",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="text-left px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-amber-400/70"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {pendingRequests.map((req) => (
+                  <tr
+                    key={req.id}
+                    className="border-b border-amber-700/20 hover:bg-amber-900/10 transition-colors"
+                    data-ocid={`backoffice.quotation_request_row.${req.id}`}
+                  >
+                    <td className="px-3 py-2.5 font-medium text-foreground">
+                      {getLeadName(req.leadId)}
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground">
+                      {getLeadDistrict(req.leadId)}
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground">
+                      {req.requestedByName || getSalesName(req.requestedBy)}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className="font-mono text-amber-300 text-xs bg-amber-900/30 px-2 py-0.5 rounded border border-amber-700/40">
+                        {req.quotationRefId}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-muted-foreground text-xs">
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {formatDateTime(req.requestedAt)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs bg-emerald-700 text-white hover:bg-emerald-600 font-semibold"
+                        onClick={() => handleConfirm(req)}
+                        disabled={confirm.isPending}
+                        data-ocid={`backoffice.confirm_quotation.${req.id}`}
+                      >
+                        {confirm.isPending ? (
+                          <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                        ) : (
+                          <CheckCircle2 className="w-3 h-3 mr-1" />
+                        )}
+                        Confirm Sent
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ── Sales Lead Card with quick actions ───────────────────────────────────────
 
 interface SalesLeadCardProps {
   lead: Lead;
   onView: (lead: Lead) => void;
+  pendingRequestLeadIds: Set<string>;
 }
 
-function SalesLeadCard({ lead, onView }: SalesLeadCardProps) {
+// Post-survey "quotation needed?" prompt state
+type QuotPromptState = "idle" | "asking" | "ref_input";
+
+function SalesLeadCard({
+  lead,
+  onView,
+  pendingRequestLeadIds,
+}: SalesLeadCardProps) {
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [quotRefOpen, setQuotRefOpen] = useState(false);
   const [quotRef, setQuotRef] = useState("");
+  const [quotSent, setQuotSent] = useState(false);
+  // Inline post-survey prompt
+  const [quotPrompt, setQuotPrompt] = useState<QuotPromptState>("idle");
+  const [promptQuotRef, setPromptQuotRef] = useState("");
 
   const updateStage = useUpdateLeadStage();
   const addRemark = useAddRemark();
+  const requestQuotation = useRequestQuotation();
+
+  const hasPendingRequest =
+    pendingRequestLeadIds.has(lead.id.toString()) || quotSent;
 
   const isSurveyDone = lead.stage === PipelineStage.surveyScheduled;
   const canMarkSurvey =
@@ -83,8 +264,39 @@ function SalesLeadCard({ lead, onView }: SalesLeadCardProps) {
         content: "Survey completed",
       });
       toast.success("Survey marked as done!");
+      // After success, show inline quotation prompt
+      setQuotPrompt("asking");
+      setNoteOpen(false);
+      setQuotRefOpen(false);
     } catch {
       toast.error("Failed to update stage.");
+    }
+  };
+
+  const handlePromptYes = () => {
+    setQuotPrompt("ref_input");
+    setPromptQuotRef("");
+  };
+
+  const handlePromptNo = () => {
+    setQuotPrompt("idle");
+  };
+
+  const handlePromptSubmit = async () => {
+    if (!promptQuotRef.trim()) return;
+    try {
+      await requestQuotation.mutateAsync({
+        leadId: lead.id,
+        quotationRefId: promptQuotRef.trim(),
+      });
+      setPromptQuotRef("");
+      setQuotPrompt("idle");
+      setQuotSent(true);
+      toast.success(
+        "Quotation request sent! Awaiting backoffice confirmation.",
+      );
+    } catch {
+      toast.error("Failed to request quotation.");
     }
   };
 
@@ -123,23 +335,24 @@ function SalesLeadCard({ lead, onView }: SalesLeadCardProps) {
 
   const handleRequestQuotation = async () => {
     if (!quotRef.trim()) return;
-    const msg = `Quotation requested - Ref: ${quotRef.trim()}`;
     try {
-      await updateStage.mutateAsync({
-        id: lead.id,
-        stage: PipelineStage.quotationSent,
-        notes: msg,
+      await requestQuotation.mutateAsync({
+        leadId: lead.id,
+        quotationRefId: quotRef.trim(),
       });
-      await addRemark.mutateAsync({ leadId: lead.id, content: msg });
       setQuotRef("");
       setQuotRefOpen(false);
-      toast.success("Quotation request submitted!");
+      setQuotSent(true);
+      toast.success(
+        "Quotation request sent! Awaiting backoffice confirmation.",
+      );
     } catch {
       toast.error("Failed to request quotation.");
     }
   };
 
-  const isBusy = updateStage.isPending || addRemark.isPending;
+  const isBusy =
+    updateStage.isPending || addRemark.isPending || requestQuotation.isPending;
 
   return (
     <div
@@ -169,29 +382,127 @@ function SalesLeadCard({ lead, onView }: SalesLeadCardProps) {
         </div>
       </div>
 
+      {/* Pending quotation notice */}
+      {hasPendingRequest && (
+        <div
+          className="flex items-center gap-1.5 text-[10px] bg-amber-900/20 border border-amber-700/40 text-amber-300 rounded px-2 py-1.5"
+          data-ocid="sales.quotation_pending_notice"
+        >
+          <Clock className="w-3 h-3 flex-shrink-0" />
+          <span className="font-semibold">
+            Quotation Request Sent — awaiting backoffice confirmation
+          </span>
+        </div>
+      )}
+
+      {/* Post-survey "Quotation needed?" inline prompt */}
+      {quotPrompt === "asking" && (
+        <div
+          className="rounded border border-cyan-700/50 bg-cyan-950/20 px-3 py-2.5 flex flex-col gap-2"
+          data-ocid="sales.quotation_prompt"
+        >
+          <p className="text-xs font-semibold text-cyan-300 flex items-center gap-1.5">
+            <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+            Survey done! Is a quotation needed for this customer?
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handlePromptYes}
+              className="flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded border bg-cyan-700/40 text-cyan-200 border-cyan-600/60 hover:bg-cyan-700/60 transition-colors"
+              data-ocid="sales.quotation_prompt_yes.button"
+            >
+              <ThumbsUp className="w-3 h-3" />
+              Yes, request quotation
+            </button>
+            <button
+              type="button"
+              onClick={handlePromptNo}
+              className="flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded border bg-muted text-muted-foreground border-border hover:bg-muted/70 transition-colors"
+              data-ocid="sales.quotation_prompt_no.button"
+            >
+              <ThumbsDown className="w-3 h-3" />
+              No, not now
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Post-survey quotation ref input (triggered from prompt) */}
+      {quotPrompt === "ref_input" && (
+        <div
+          className="rounded border border-cyan-700/50 bg-cyan-950/20 px-3 py-2.5 flex flex-col gap-2"
+          data-ocid="sales.quotation_prompt_ref"
+        >
+          <p className="text-[10px] font-semibold text-cyan-300 uppercase tracking-wide">
+            Enter Quotation Reference ID
+          </p>
+          <input
+            type="text"
+            value={promptQuotRef}
+            onChange={(e) => setPromptQuotRef(e.target.value)}
+            placeholder="e.g. QT-2024-001"
+            className="bg-muted border border-border rounded px-2 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-cyan-500/50"
+            data-ocid="sales.quotation_prompt_ref_input"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handlePromptSubmit();
+              if (e.key === "Escape") setQuotPrompt("asking");
+            }}
+          />
+          <div className="flex gap-1.5">
+            <Button
+              size="sm"
+              className="h-7 text-xs bg-cyan-700 text-white hover:bg-cyan-600 font-semibold"
+              onClick={handlePromptSubmit}
+              disabled={requestQuotation.isPending || !promptQuotRef.trim()}
+              data-ocid="sales.quotation_prompt_submit.button"
+            >
+              {requestQuotation.isPending ? (
+                <Loader2 className="w-3 h-3 animate-spin mr-1" />
+              ) : null}
+              Submit Request
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 text-xs text-muted-foreground"
+              onClick={() => setQuotPrompt("asking")}
+            >
+              Back
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Quick action buttons */}
       <div className="flex flex-wrap gap-1.5 pt-1 border-t border-border/50">
-        {/* Survey Done */}
-        {canMarkSurvey && (
+        {/* Survey Done — shown for inquiry stage only; once done it's hidden */}
+        {canMarkSurvey && !isSurveyDone && (
           <button
             type="button"
-            disabled={isSurveyDone || isBusy}
+            disabled={isBusy}
             onClick={handleSurveyDone}
-            className={cn(
-              "flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded border transition-colors",
-              isSurveyDone
-                ? "bg-amber-900/20 text-amber-400 border-amber-700/40 cursor-default opacity-70"
-                : "bg-amber-900/30 text-amber-300 border-amber-700/50 hover:bg-amber-900/50",
-            )}
+            className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded border transition-colors bg-amber-900/30 text-amber-300 border-amber-700/50 hover:bg-amber-900/50"
             data-ocid="sales.survey_done.button"
           >
-            {isBusy && !isSurveyDone ? (
+            {isBusy ? (
               <Loader2 className="w-3 h-3 animate-spin" />
             ) : (
               <CheckCircle2 className="w-3 h-3" />
             )}
-            {isSurveyDone ? "Survey Completed" : "Survey Done"}
+            Survey Done
           </button>
+        )}
+
+        {/* Survey completed label — shown once marked done */}
+        {isSurveyDone && (
+          <span
+            className="flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded border bg-amber-900/20 text-amber-400 border-amber-700/40 opacity-70 cursor-default"
+            data-ocid="sales.survey_completed_label"
+          >
+            <CheckCircle2 className="w-3 h-3" />
+            Survey Completed
+          </span>
         )}
 
         {/* Mark Booking Confirmed */}
@@ -214,8 +525,10 @@ function SalesLeadCard({ lead, onView }: SalesLeadCardProps) {
             </button>
           )}
 
-        {/* Request Quotation */}
-        {lead.stage !== PipelineStage.quotationSent &&
+        {/* Request Quotation button — hidden if prompt active, already pending/sent, or in terminal stages */}
+        {quotPrompt === "idle" &&
+          !hasPendingRequest &&
+          lead.stage !== PipelineStage.quotationSent &&
           lead.stage !== PipelineStage.bookingConfirmed &&
           lead.stage !== PipelineStage.closedWon &&
           lead.stage !== PipelineStage.closedLost && (
@@ -297,8 +610,8 @@ function SalesLeadCard({ lead, onView }: SalesLeadCardProps) {
         </div>
       )}
 
-      {/* Request Quotation inline */}
-      {quotRefOpen && (
+      {/* Manual Request Quotation inline (from button in action bar) */}
+      {quotRefOpen && quotPrompt === "idle" && (
         <div className="flex flex-col gap-1.5 pt-1">
           <input
             type="text"
@@ -313,13 +626,13 @@ function SalesLeadCard({ lead, onView }: SalesLeadCardProps) {
               size="sm"
               className="h-7 text-xs bg-cyan-700 text-white hover:bg-cyan-600 font-semibold"
               onClick={handleRequestQuotation}
-              disabled={updateStage.isPending || !quotRef.trim()}
+              disabled={requestQuotation.isPending || !quotRef.trim()}
               data-ocid="sales.quotation_submit.button"
             >
-              {updateStage.isPending ? (
+              {requestQuotation.isPending ? (
                 <Loader2 className="w-3 h-3 animate-spin mr-1" />
               ) : null}
-              Submit
+              Submit Request
             </Button>
             <Button
               size="sm"
@@ -343,13 +656,24 @@ function SalesLeadCard({ lead, onView }: SalesLeadCardProps) {
 
 function SalesDashboard() {
   const [editLead, setEditLead] = useState<Lead | null>(null);
+  const [addLeadOpen, setAddLeadOpen] = useState(false);
   const navigate = useNavigate();
-  const { userId } = useAuth();
+  const { userId, userRole } = useAuth();
   const { data: myLeads = [], isLoading } = useMyLeads();
   const { data: districts = [] } = useAllDistricts();
   const { data: users = [] } = useAllUsers();
+  const { data: pendingRequests = [] } = useGetPendingQuotationRequests();
+  const { data: salesLeadToggle = false } = useGetSalesLeadGenerationToggle();
   const updateLead = useUpdateLead();
+  const addLead = useAddLead();
   const salesUsers = users.filter((u) => u.role === UserRole.sales);
+
+  // Build set of lead IDs that have pending requests (so card knows)
+  const pendingRequestLeadIds = new Set(
+    pendingRequests
+      .filter((r) => r.status === QuotationRequestStatus.pending)
+      .map((r) => r.leadId.toString()),
+  );
 
   const leadsByStage: Record<PipelineStage, Lead[]> = {
     [PipelineStage.inquiry]: [],
@@ -374,12 +698,26 @@ function SalesDashboard() {
       showRightPanel={false}
     >
       <div className="mb-6">
-        <h1 className="text-2xl font-extrabold tracking-tight text-foreground uppercase">
-          My Assigned Leads
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Leads assigned to you — Shree Adishakti Solar Pvt Ltd
-        </p>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-foreground uppercase">
+              My Assigned Leads
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Leads assigned to you — Shree Adishakti Solar Pvt Ltd
+            </p>
+          </div>
+          {salesLeadToggle && (
+            <Button
+              className="bg-gold text-[#0A1220] hover:bg-gold/90 font-semibold flex-shrink-0"
+              onClick={() => setAddLeadOpen(true)}
+              data-ocid="sales.create_lead.button"
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Create Lead
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Summary pills */}
@@ -426,8 +764,21 @@ function SalesDashboard() {
             No leads assigned yet
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Your manager will assign leads to you soon.
+            {salesLeadToggle
+              ? "Create your first lead using the button above, or wait for your manager to assign one."
+              : "Your manager will assign leads to you soon."}
           </p>
+          {salesLeadToggle && (
+            <Button
+              size="sm"
+              className="mt-3 bg-gold text-[#0A1220] hover:bg-gold/90"
+              onClick={() => setAddLeadOpen(true)}
+              data-ocid="sales.empty_create_lead.button"
+            >
+              <UserPlus className="w-3.5 h-3.5 mr-1.5" />
+              Create Lead
+            </Button>
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-6">
@@ -455,6 +806,7 @@ function SalesDashboard() {
                     key={lead.id.toString()}
                     lead={lead}
                     onView={setEditLead}
+                    pendingRequestLeadIds={pendingRequestLeadIds}
                   />
                 ))}
               </div>
@@ -463,6 +815,7 @@ function SalesDashboard() {
         </div>
       )}
 
+      {/* View/Edit existing lead */}
       <LeadModal
         open={!!editLead}
         onClose={() => setEditLead(null)}
@@ -470,10 +823,26 @@ function SalesDashboard() {
         districts={districts}
         salesUsers={salesUsers}
         currentUserId={userId ?? ""}
+        currentUserRole={userRole ?? undefined}
         onSubmit={async (params) => {
           if (editLead) {
             await updateLead.mutateAsync({ leadId: editLead.id, ...params });
           }
+        }}
+      />
+
+      {/* Create new lead — sales self-assign */}
+      <LeadModal
+        open={addLeadOpen}
+        onClose={() => setAddLeadOpen(false)}
+        editLead={null}
+        districts={districts}
+        salesUsers={salesUsers}
+        currentUserId={userId ?? ""}
+        currentUserRole={userRole ?? undefined}
+        isSalesSelfCreate
+        onSubmit={async (params) => {
+          await addLead.mutateAsync(params);
         }}
       />
     </Layout>
@@ -587,6 +956,9 @@ function AdminDashboard() {
           accent
         />
       </div>
+
+      {/* Pending Quotation Requests Panel (backoffice/admin only) */}
+      <PendingQuotationPanel allLeads={allLeads} allUsers={users} />
 
       {/* Pipeline Board */}
       <div className="mb-6">

@@ -70,6 +70,20 @@ export interface QuotationItem {
   'quantity' : number,
   'unitPrice' : number,
 }
+export interface QuotationRequest {
+  'id' : string,
+  'status' : QuotationRequestStatus,
+  'quotationRefId' : string,
+  'confirmedAt' : [] | [Time],
+  'confirmedBy' : [] | [string],
+  'confirmedByName' : [] | [string],
+  'leadId' : bigint,
+  'requestedByName' : string,
+  'requestedAt' : Time,
+  'requestedBy' : string,
+}
+export type QuotationRequestStatus = { 'pending' : null } |
+  { 'confirmed' : null };
 export type QuotationStatus = { 'sent' : null } |
   { 'rejected' : null } |
   { 'accepted' : null } |
@@ -132,6 +146,15 @@ export interface _SERVICE {
     { 'ok' : null } |
       { 'err' : string }
   >,
+  /**
+   * / Backoffice/admin confirms a quotation request. Sets status to #confirmed,
+   * / moves the lead to #quotationSent, and adds a remark.
+   */
+  'confirmQuotationRequest' : ActorMethod<
+    [string, string],
+    { 'ok' : QuotationRequest } |
+      { 'err' : string }
+  >,
   'createQuotation' : ActorMethod<
     [string, string, QuotationInput],
     { 'ok' : Quotation } |
@@ -156,6 +179,14 @@ export interface _SERVICE {
   'getAllLeads' : ActorMethod<
     [string],
     { 'ok' : Array<Lead> } |
+      { 'err' : string }
+  >,
+  /**
+   * / Returns all QuotationRequests regardless of status. Accessible by backoffice and admin.
+   */
+  'getAllQuotationRequests' : ActorMethod<
+    [string],
+    { 'ok' : Array<QuotationRequest> } |
       { 'err' : string }
   >,
   'getAllQuotations' : ActorMethod<
@@ -209,6 +240,14 @@ export interface _SERVICE {
     { 'ok' : UserProfile } |
       { 'err' : string }
   >,
+  /**
+   * / Returns all QuotationRequests with #pending status. Accessible by backoffice and admin.
+   */
+  'getPendingQuotationRequests' : ActorMethod<
+    [string],
+    { 'ok' : Array<QuotationRequest> } |
+      { 'err' : string }
+  >,
   'getQuotationById' : ActorMethod<
     [string, string],
     { 'ok' : [] | [Quotation] } |
@@ -217,6 +256,15 @@ export interface _SERVICE {
   'getQuotationsByLead' : ActorMethod<
     [string, string],
     { 'ok' : Array<Quotation> } |
+      { 'err' : string }
+  >,
+  /**
+   * / Returns the current value of the sales lead generation toggle.
+   * / Any authenticated user can read this.
+   */
+  'getSalesLeadGenerationToggle' : ActorMethod<
+    [string],
+    { 'ok' : boolean } |
       { 'err' : string }
   >,
   'getTotalLeadsCount' : ActorMethod<
@@ -236,7 +284,24 @@ export interface _SERVICE {
       { 'err' : string }
   >,
   'logout' : ActorMethod<[string], undefined>,
+  /**
+   * / Sales requests a quotation for a lead. Creates a QuotationRequest with #pending status.
+   * / Does NOT change the lead stage. Adds a remark to the lead.
+   */
+  'requestQuotation' : ActorMethod<
+    [string, bigint, string],
+    { 'ok' : QuotationRequest } |
+      { 'err' : string }
+  >,
   'seedDistricts' : ActorMethod<[], Array<string>>,
+  /**
+   * / Admin-only: enable or disable sales staff from creating and self-assigning their own leads.
+   */
+  'setSalesLeadGenerationToggle' : ActorMethod<
+    [string, boolean],
+    { 'ok' : null } |
+      { 'err' : string }
+  >,
   'updateLead' : ActorMethod<
     [
       string,

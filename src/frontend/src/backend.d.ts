@@ -7,6 +7,24 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
+export type Time = bigint;
+export interface Remark {
+    content: string;
+    addedAt: Time;
+    addedBy: string;
+}
+export interface QuotationRequest {
+    id: string;
+    status: QuotationRequestStatus;
+    quotationRefId: string;
+    confirmedAt?: Time;
+    confirmedBy?: string;
+    confirmedByName?: string;
+    leadId: bigint;
+    requestedByName: string;
+    requestedAt: Time;
+    requestedBy: string;
+}
 export interface Lead {
     id: bigint;
     customerName: string;
@@ -23,34 +41,6 @@ export interface Lead {
     requirements: Requirement;
     assignedSalesPerson?: string;
     remarks: Array<Remark>;
-}
-export interface QuotationItem {
-    description: string;
-    itemName: string;
-    quantity: number;
-    unitPrice: number;
-}
-export type Time = bigint;
-export interface Requirement {
-    panelSize: string;
-    notes: string;
-    estimatedValue: bigint;
-    systemType: string;
-}
-export interface QuotationInput {
-    customerName: string;
-    panelCapacity: number;
-    gstPercent: number;
-    validityDays: bigint;
-    customerAddress: string;
-    notes: string;
-    items: Array<QuotationItem>;
-    systemType: string;
-}
-export interface Remark {
-    content: string;
-    addedAt: Time;
-    addedBy: string;
 }
 export interface Quotation {
     id: string;
@@ -72,6 +62,28 @@ export interface Quotation {
     subtotal: number;
     systemType: string;
 }
+export interface QuotationItem {
+    description: string;
+    itemName: string;
+    quantity: number;
+    unitPrice: number;
+}
+export interface Requirement {
+    panelSize: string;
+    notes: string;
+    estimatedValue: bigint;
+    systemType: string;
+}
+export interface QuotationInput {
+    customerName: string;
+    panelCapacity: number;
+    gstPercent: number;
+    validityDays: bigint;
+    customerAddress: string;
+    notes: string;
+    items: Array<QuotationItem>;
+    systemType: string;
+}
 export interface UserProfile {
     whatsAppNumber: string;
     userId: string;
@@ -91,6 +103,10 @@ export enum PipelineStage {
     quotationSent = "quotationSent",
     installation = "installation",
     closedLost = "closedLost"
+}
+export enum QuotationRequestStatus {
+    pending = "pending",
+    confirmed = "confirmed"
 }
 export enum QuotationStatus {
     sent = "sent",
@@ -146,6 +162,17 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    /**
+     * / Backoffice/admin confirms a quotation request. Sets status to #confirmed,
+     * / moves the lead to #quotationSent, and adds a remark.
+     */
+    confirmQuotationRequest(sessionToken: string, requestId: string): Promise<{
+        __kind__: "ok";
+        ok: QuotationRequest;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     createQuotation(sessionToken: string, leadId: string, data: QuotationInput): Promise<{
         __kind__: "ok";
         ok: Quotation;
@@ -178,6 +205,16 @@ export interface backendInterface {
     getAllLeads(sessionToken: string): Promise<{
         __kind__: "ok";
         ok: Array<Lead>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    /**
+     * / Returns all QuotationRequests regardless of status. Accessible by backoffice and admin.
+     */
+    getAllQuotationRequests(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: Array<QuotationRequest>;
     } | {
         __kind__: "err";
         err: string;
@@ -253,6 +290,16 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
+    /**
+     * / Returns all QuotationRequests with #pending status. Accessible by backoffice and admin.
+     */
+    getPendingQuotationRequests(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: Array<QuotationRequest>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     getQuotationById(sessionToken: string, id: string): Promise<{
         __kind__: "ok";
         ok: Quotation | null;
@@ -263,6 +310,17 @@ export interface backendInterface {
     getQuotationsByLead(sessionToken: string, leadId: string): Promise<{
         __kind__: "ok";
         ok: Array<Quotation>;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
+    /**
+     * / Returns the current value of the sales lead generation toggle.
+     * / Any authenticated user can read this.
+     */
+    getSalesLeadGenerationToggle(sessionToken: string): Promise<{
+        __kind__: "ok";
+        ok: boolean;
     } | {
         __kind__: "err";
         err: string;
@@ -290,7 +348,28 @@ export interface backendInterface {
         err: string;
     }>;
     logout(sessionToken: string): Promise<void>;
+    /**
+     * / Sales requests a quotation for a lead. Creates a QuotationRequest with #pending status.
+     * / Does NOT change the lead stage. Adds a remark to the lead.
+     */
+    requestQuotation(sessionToken: string, leadId: bigint, quotationRefId: string): Promise<{
+        __kind__: "ok";
+        ok: QuotationRequest;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     seedDistricts(): Promise<Array<string>>;
+    /**
+     * / Admin-only: enable or disable sales staff from creating and self-assigning their own leads.
+     */
+    setSalesLeadGenerationToggle(sessionToken: string, enabled: boolean): Promise<{
+        __kind__: "ok";
+        ok: null;
+    } | {
+        __kind__: "err";
+        err: string;
+    }>;
     updateLead(sessionToken: string, leadId: bigint, customerName: string, phone: string, email: string, address: string, district: string, requirements: Requirement, notes: string): Promise<{
         __kind__: "ok";
         ok: Lead;

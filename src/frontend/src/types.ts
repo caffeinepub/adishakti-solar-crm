@@ -166,6 +166,10 @@ export function formatCurrencyNum(value: number): string {
   return `₹${value.toFixed(0)}`;
 }
 
+// ── Quotation Request types ────────────────────────────────────────────────
+
+export type { QuotationRequest, QuotationRequestStatus } from "./backend";
+
 // ── Quotation types ────────────────────────────────────────────────────────
 
 export interface QuotationItem {

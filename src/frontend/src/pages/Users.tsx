@@ -37,6 +37,7 @@ import {
   Loader2,
   MapPin,
   Plus,
+  Settings2,
   Trash2,
   UserPlus,
   Users,
@@ -55,6 +56,8 @@ import {
   useChangePassword,
   useCreateUser,
   useDeleteUser,
+  useGetSalesLeadGenerationToggle,
+  useSetSalesLeadGenerationToggle,
   useUpdateUser,
 } from "../hooks/useQueries";
 import { DEFAULT_DISTRICTS, ROLE_COLORS, ROLE_LABELS } from "../types";
@@ -69,22 +72,35 @@ const DISCOM_ZONES: {
   districts: string[];
 }[] = [
   {
+    code: "TPCODL",
+    name: "TP Central Odisha Distribution Ltd",
+    color: "bg-purple-900/40 border-purple-700/50",
+    textColor: "text-purple-300",
+    districts: ["Khordha", "Cuttack", "Jagatsinghpur", "Dhenkanal", "Jajpur"],
+  },
+  {
+    code: "TPWODL",
+    name: "TP Western Odisha Distribution Ltd",
+    color: "bg-amber-900/40 border-amber-700/50",
+    textColor: "text-amber-300",
+    districts: [
+      "Sundargarh",
+      "Jharsuguda",
+      "Sambalpur",
+      "Deogarh",
+      "Bargarh",
+      "Subarnapur",
+      "Balangir",
+      "Nuapada",
+      "Kalahandi",
+    ],
+  },
+  {
     code: "TPNODL",
     name: "TP Northern Odisha Distribution Ltd",
     color: "bg-blue-900/40 border-blue-700/50",
     textColor: "text-blue-300",
-    districts: [
-      "Balasore",
-      "Bhadrak",
-      "Mayurbhanj",
-      "Kendujhar",
-      "Jajpur",
-      "Jagatsinghpur",
-      "Cuttack",
-      "Kendrapara",
-      "Dhenkanal",
-      "Angul",
-    ],
+    districts: ["Balasore", "Bhadrak", "Mayurbhanj", "Jajpur", "Kendujhar"],
   },
   {
     code: "TPSODL",
@@ -94,37 +110,13 @@ const DISCOM_ZONES: {
     districts: [
       "Ganjam",
       "Gajapati",
+      "Kandhamal",
       "Rayagada",
       "Koraput",
       "Malkangiri",
       "Nabarangpur",
-      "Kandhamal",
-      "Kalahandi",
+      "Nayagarh",
     ],
-  },
-  {
-    code: "TPWODL",
-    name: "TP Western Odisha Distribution Ltd",
-    color: "bg-amber-900/40 border-amber-700/50",
-    textColor: "text-amber-300",
-    districts: [
-      "Sambalpur",
-      "Bargarh",
-      "Jharsuguda",
-      "Sundargarh",
-      "Deogarh",
-      "Balangir",
-      "Subarnapur",
-      "Boudh",
-      "Nuapada",
-    ],
-  },
-  {
-    code: "TPCODL",
-    name: "TP Central Odisha Distribution Ltd",
-    color: "bg-purple-900/40 border-purple-700/50",
-    textColor: "text-purple-300",
-    districts: ["Khordha", "Puri", "Nayagarh"],
   },
 ];
 
@@ -948,6 +940,89 @@ function CreateUserForm({ allDistricts, onCreated }: CreateUserFormProps) {
   );
 }
 
+// ── Feature Settings Panel ─────────────────────────────────────────────────
+
+function FeatureSettingsPanel() {
+  const { data: toggleEnabled = false, isLoading } =
+    useGetSalesLeadGenerationToggle();
+  const setToggle = useSetSalesLeadGenerationToggle();
+
+  const handleToggle = async (enabled: boolean) => {
+    try {
+      await setToggle.mutateAsync(enabled);
+      toast.success(
+        enabled
+          ? "Sales staff can now create and self-assign leads."
+          : "Sales lead creation has been disabled.",
+      );
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to update setting.";
+      toast.error(msg);
+    }
+  };
+
+  return (
+    <div
+      className="bg-card rounded-lg border border-border p-4"
+      data-ocid="feature_settings.panel"
+    >
+      <div className="flex items-center gap-2 mb-4">
+        <Settings2 className="w-4 h-4 text-gold" />
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+          Feature Settings
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between gap-4 py-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-foreground">
+            Allow Sales Staff to Create Own Leads
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            When enabled, sales staff can create new leads and they will be
+            automatically assigned to themselves.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          ) : (
+            <>
+              <span
+                className={cn(
+                  "text-[10px] font-bold uppercase tracking-wide",
+                  toggleEnabled ? "text-emerald-400" : "text-muted-foreground",
+                )}
+              >
+                {toggleEnabled ? "On" : "Off"}
+              </span>
+              <Switch
+                checked={toggleEnabled}
+                onCheckedChange={handleToggle}
+                disabled={setToggle.isPending}
+                data-ocid="feature_settings.sales_lead_toggle"
+              />
+            </>
+          )}
+        </div>
+      </div>
+
+      {toggleEnabled && (
+        <div className="mt-3 flex items-start gap-2 px-3 py-2.5 rounded-lg bg-emerald-950/30 border border-emerald-700/40">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5" />
+          <p className="text-[11px] text-emerald-300">
+            Sales staff will see a{" "}
+            <span className="font-semibold">"Create Lead"</span> button on their
+            dashboard and the Leads page. New leads they create will be
+            auto-assigned to their own account.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────
 
 export default function UsersPage() {
@@ -1159,6 +1234,13 @@ export default function UsersPage() {
 
       {/* DISCOM Zone Reference */}
       <DiscomZoneReference />
+
+      {/* Feature Settings — admin only */}
+      {isAdmin && (
+        <div className="mt-4">
+          <FeatureSettingsPanel />
+        </div>
+      )}
 
       {/* Created User Credentials */}
       {createdCreds && (

@@ -42,6 +42,8 @@ import {
   useAllLeads,
   useAllUsers,
   useDeleteLead,
+  useGetSalesLeadGenerationToggle,
+  useMyLeads,
   useUpdateLead,
   useUpdateLeadStage,
 } from "../hooks/useQueries";
@@ -62,17 +64,25 @@ export default function Leads() {
   const [deleteTarget, setDeleteTarget] = useState<Lead | null>(null);
   const { userId, userRole } = useAuth();
 
-  const { data: allLeads = [], isLoading } = useAllLeads();
   const { data: districts = [] } = useAllDistricts();
   const { data: users = [] } = useAllUsers();
+  const { data: salesLeadToggle = false } = useGetSalesLeadGenerationToggle();
   const addLead = useAddLead();
   const updateLead = useUpdateLead();
   const updateStage = useUpdateLeadStage();
   const deleteLead = useDeleteLead();
 
   const isAdmin = userRole === UserRole.admin;
+  const isSales = userRole === UserRole.sales;
+
+  const { data: allLeadsData = [], isLoading: allLeadsLoading } = useAllLeads();
+  const { data: myLeadsData = [], isLoading: myLeadsLoading } = useMyLeads();
+  const allLeads = isSales ? myLeadsData : allLeadsData;
+  const isLoading = isSales ? myLeadsLoading : allLeadsLoading;
   const canAddLead =
-    userRole === UserRole.admin || userRole === UserRole.backoffice;
+    userRole === UserRole.admin ||
+    userRole === UserRole.backoffice ||
+    (isSales && salesLeadToggle);
 
   const salesUsers = users.filter((u) => u.role === UserRole.sales);
 
@@ -330,6 +340,7 @@ export default function Leads() {
         salesUsers={salesUsers}
         currentUserId={userId ?? ""}
         currentUserRole={userRole ?? undefined}
+        isSalesSelfCreate={!editLead && isSales}
         onDelete={isAdmin ? (lead) => setDeleteTarget(lead) : undefined}
         onSubmit={async (params) => {
           if (editLead) {

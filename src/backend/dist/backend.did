@@ -44,6 +44,24 @@ type QuotationStatus =
    rejected;
    sent;
  };
+type QuotationRequestStatus = 
+ variant {
+   confirmed;
+   pending;
+ };
+type QuotationRequest = 
+ record {
+   confirmedAt: opt Time;
+   confirmedBy: opt text;
+   confirmedByName: opt text;
+   id: text;
+   leadId: nat;
+   quotationRefId: text;
+   requestedAt: Time;
+   requestedBy: text;
+   requestedByName: text;
+   status: QuotationRequestStatus;
+ };
 type QuotationItem = 
  record {
    description: text;
@@ -140,6 +158,13 @@ service : {
       err: text;
       ok;
     });
+  /// Backoffice/admin confirms a quotation request. Sets status to #confirmed,
+  /// moves the lead to #quotationSent, and adds a remark.
+  confirmQuotationRequest: (sessionToken: text, requestId: text) ->
+   (variant {
+      err: text;
+      ok: QuotationRequest;
+    });
   createQuotation: (sessionToken: text, leadId: text, data:
    QuotationInput) -> (variant {
                          err: text;
@@ -166,6 +191,12 @@ service : {
    (variant {
       err: text;
       ok: vec Lead;
+    }) query;
+  /// Returns all QuotationRequests regardless of status. Accessible by backoffice and admin.
+  getAllQuotationRequests: (sessionToken: text) ->
+   (variant {
+      err: text;
+      ok: vec QuotationRequest;
     }) query;
   getAllQuotations: (sessionToken: text) ->
    (variant {
@@ -224,6 +255,12 @@ service : {
       err: text;
       ok: UserProfile;
     }) query;
+  /// Returns all QuotationRequests with #pending status. Accessible by backoffice and admin.
+  getPendingQuotationRequests: (sessionToken: text) ->
+   (variant {
+      err: text;
+      ok: vec QuotationRequest;
+    }) query;
   getQuotationById: (sessionToken: text, id: text) ->
    (variant {
       err: text;
@@ -233,6 +270,13 @@ service : {
    (variant {
       err: text;
       ok: vec Quotation;
+    }) query;
+  /// Returns the current value of the sales lead generation toggle.
+  /// Any authenticated user can read this.
+  getSalesLeadGenerationToggle: (sessionToken: text) ->
+   (variant {
+      err: text;
+      ok: bool;
     }) query;
   getTotalLeadsCount: (sessionToken: text) ->
    (variant {
@@ -250,7 +294,20 @@ service : {
                                                 ok: text;
                                               });
   logout: (sessionToken: text) -> ();
+  /// Sales requests a quotation for a lead. Creates a QuotationRequest with #pending status.
+  /// Does NOT change the lead stage. Adds a remark to the lead.
+  requestQuotation: (sessionToken: text, leadId: nat, quotationRefId:
+   text) -> (variant {
+               err: text;
+               ok: QuotationRequest;
+             });
   seedDistricts: () -> (vec text) query;
+  /// Admin-only: enable or disable sales staff from creating and self-assigning their own leads.
+  setSalesLeadGenerationToggle: (sessionToken: text, enabled: bool) ->
+   (variant {
+      err: text;
+      ok;
+    });
   updateLead: (sessionToken: text, leadId: nat, customerName: text, phone:
    text, email: text, address: text, district: text, requirements:
    Requirement, notes: text) -> (variant {

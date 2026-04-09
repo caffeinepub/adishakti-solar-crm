@@ -11,6 +11,8 @@ import AccessControl "mo:caffeineai-authorization/access-control";
 
 
 
+
+
 actor {
 
   // Authorization mixin (retained for platform lint compliance)
@@ -84,6 +86,28 @@ actor {
     stage                   : PipelineStage;
     notes                   : Text;
     remarks                 : [Remark];
+  };
+
+  // ─────────────────────────────────────────────
+  //  QUOTATION REQUEST TYPES
+  // ─────────────────────────────────────────────
+
+  public type QuotationRequestStatus = {
+    #pending;
+    #confirmed;
+  };
+
+  public type QuotationRequest = {
+    id              : Text;
+    leadId          : Nat;
+    requestedBy     : Text; // sales userId
+    requestedByName : Text;
+    requestedAt     : Time.Time;
+    quotationRefId  : Text;
+    status          : QuotationRequestStatus;
+    confirmedAt     : ?Time.Time;
+    confirmedBy     : ?Text;
+    confirmedByName : ?Text;
   };
 
   // ─────────────────────────────────────────────
@@ -182,23 +206,42 @@ actor {
   //  STATE
   // ─────────────────────────────────────────────
 
-  let users       = Map.empty<Text, UserProfile>();
-  let sessions    = Map.empty<Text, SessionData>();
+  // All Map state is flexible var so it survives upgrades via enhanced orthogonal persistence
+  flexible var users             = Map.empty<Text, UserProfile>();
+  flexible var sessions          = Map.empty<Text, SessionData>();
   // leads stores OldLead (compatible with pre-quotationSent snapshot) for stable persistence
-  let leads       = Map.empty<Nat, OldLead>();
-  let quotations  = Map.empty<Text, Quotation>();
-  var nextLeadId       : Nat = 1;
-  var nextQuotationSeq : Nat = 1;
+  let leads              = Map.empty<Nat, OldLead>();
+  flexible var quotations         = Map.empty<Text, Quotation>();
+  flexible var quotationRequests  = Map.empty<Text, QuotationRequest>();
+  // Counters kept as stable `var` so they carry over naturally on upgrade
+  var nextLeadId              : Nat = 1;
+  var nextQuotationSeq        : Nat = 1;
+  var nextQuotationRequestSeq : Nat = 1;
+
+  // Feature toggle: when true, sales staff can create their own leads and self-assign
+  flexible var allowSalesLeadGeneration : Bool = false;
 
   // Working map with new Lead type (rebuilt from leads in postupgrade)
   flexible var leadsMap = Map.empty<Nat, Lead>();
+
+  // Legacy stable arrays kept only for one-time migration from old heap-only Maps.
+  // Once postupgrade drains them into the flexible var maps above, they stay empty forever.
+  flexible var stableUsers             : [(Text, UserProfile)]       = [];
+  flexible var stableSessions          : [(Text, SessionData)]        = [];
+  flexible var stableQuotationRequests : [(Text, QuotationRequest)]  = [];
 
   // ─────────────────────────────────────────────
   //  UPGRADE HOOKS
   // ─────────────────────────────────────────────
 
   system func preupgrade() {
-    // Serialize leadsMap back to leads (as OldLead, dropping quotationSent → surveyScheduled for compat)
+    // All primary state (users, sessions, quotations, quotationRequests, leadsMap,
+    // nextLeadId, nextQuotationSeq, nextQuotationRequestSeq) are flexible var — they
+    // survive upgrades automatically via enhanced orthogonal persistence.
+    // No manual serialisation needed.
+
+    // Persist leadsMap back into the OldLead-typed leads Map so the old snapshot
+    // format is preserved for any future downgrade compatibility.
     for ((k, l) in leadsMap.entries()) {
       let oldStage : OldPipelineStage = switch (l.stage) {
         case (#inquiry)          { #inquiry };
@@ -231,45 +274,64 @@ actor {
   };
 
   system func postupgrade() {
-    leadsMap := Map.empty<Nat, Lead>();
-    for ((k, oldLead) in leads.entries()) {
-      let newLead : Lead = {
-        id                       = oldLead.id;
-        customerName             = oldLead.customerName;
-        phone                    = oldLead.phone;
-        email                    = oldLead.email;
-        address                  = oldLead.address;
-        district                 = oldLead.district;
-        requirements             = oldLead.requirements;
-        assignedSalesPerson      = oldLead.assignedSalesPerson;
-        assignedOperationsPerson = oldLead.assignedOperationsPerson;
-        createdBy                = oldLead.createdBy;
-        createdAt                = oldLead.createdAt;
-        updatedAt                = oldLead.updatedAt;
-        stage                    = migrateStage(oldLead.stage);
-        notes                    = oldLead.notes;
-        remarks                  = oldLead.remarks;
+    // ONE-TIME MIGRATION: drain any legacy stableUsers/stableSessions/stableQuotationRequests
+    // arrays left by a previous version that used heap-only Maps + manual serialisation.
+    // On all subsequent upgrades these arrays will already be empty, so this is a no-op.
+    for ((k, v) in stableUsers.values()) {
+      switch (users.get(k)) {
+        case null { users.add(k, v) };
+        case (?_) {}; // already present in flexible var map — keep existing
       };
-      leadsMap.add(k, newLead);
+    };
+    stableUsers := [];
+
+    let now = Time.now();
+    for ((k, v) in stableSessions.values()) {
+      let age : Int = now - v.createdAt;
+      if (age <= sessionTtlNanos) {
+        switch (sessions.get(k)) {
+          case null { sessions.add(k, v) };
+          case (?_) {};
+        };
+      };
+    };
+    stableSessions := [];
+
+    for ((k, v) in stableQuotationRequests.values()) {
+      switch (quotationRequests.get(k)) {
+        case null { quotationRequests.add(k, v) };
+        case (?_) {};
+      };
+    };
+    stableQuotationRequests := [];
+
+    // Rebuild leadsMap from stable leads array (schema migration — OldLead → Lead)
+    for ((k, oldLead) in leads.entries()) {
+      if (leadsMap.get(k) == null) {
+        let newLead : Lead = {
+          id                       = oldLead.id;
+          customerName             = oldLead.customerName;
+          phone                    = oldLead.phone;
+          email                    = oldLead.email;
+          address                  = oldLead.address;
+          district                 = oldLead.district;
+          requirements             = oldLead.requirements;
+          assignedSalesPerson      = oldLead.assignedSalesPerson;
+          assignedOperationsPerson = oldLead.assignedOperationsPerson;
+          createdBy                = oldLead.createdBy;
+          createdAt                = oldLead.createdAt;
+          updatedAt                = oldLead.updatedAt;
+          stage                    = migrateStage(oldLead.stage);
+          notes                    = oldLead.notes;
+          remarks                  = oldLead.remarks;
+        };
+        leadsMap.add(k, newLead);
+      };
     };
     leads.clear();
-    // Ensure default admin account always exists after every upgrade
-    switch (users.get("admin")) {
-      case null {
-        users.add("admin", {
-          userId       = "admin";
-          passwordHash = "Admin@1234";
-          name         = "Administrator";
-          role         = #admin;
-          district     = "";
-          phone        = "";
-          email        = "";
-          whatsAppNumber = "";
-          isActive     = true;
-        });
-      };
-      case (?_) {}; // admin already exists, leave it untouched
-    };
+
+    // Ensure admin account always exists — idempotent: only creates if missing
+    ensureAdminExists();
   };
 
   // ─────────────────────────────────────────────
@@ -289,23 +351,28 @@ actor {
   //  INIT — seed admin
   // ─────────────────────────────────────────────
 
-  // Seed admin only if not already present — idempotent so upgrades never wipe existing account
-  switch (users.get("admin")) {
-    case null {
-      users.add("admin", {
-        userId       = "admin";
-        passwordHash = "Admin@1234";
-        name         = "Administrator";
-        role         = #admin;
-        district     = "";
-        phone        = "";
-        email        = "";
-        whatsAppNumber = "";
-        isActive     = true;
-      });
+  // Single authoritative function for seeding admin — idempotent, never overwrites
+  func ensureAdminExists() {
+    switch (users.get("admin")) {
+      case null {
+        users.add("admin", {
+          userId         = "admin";
+          passwordHash   = "Admin@1234";
+          name           = "Administrator";
+          role           = #admin;
+          district       = "";
+          phone          = "";
+          email          = "";
+          whatsAppNumber = "";
+          isActive       = true;
+        });
+      };
+      case (?_) {}; // admin already present — leave untouched
     };
-    case (?_) {}; // admin already exists, leave it untouched
   };
+
+  // Called on fresh deploy (no postupgrade runs on first install)
+  ensureAdminExists();
 
   // ─────────────────────────────────────────────
   //  INTERNAL HELPERS
@@ -548,13 +615,19 @@ actor {
     notes         : Text
   ) : async { #ok : Lead; #err : Text } {
     let caller = requireSession(sessionToken);
+    // Sales staff can only create leads when the toggle is enabled
+    if (caller.role == #sales and not allowSalesLeadGeneration) {
+      return #err("Sales lead generation is not enabled");
+    };
+    // When a sales user creates a lead, auto-assign themselves
+    let selfAssign : ?Text = if (caller.role == #sales) { ?caller.userId } else { null };
     let id = nextLeadId;
     nextLeadId += 1;
     let lead : Lead = {
       id;
       customerName; phone; email; address; district;
       requirements; notes;
-      assignedSalesPerson      = null;
+      assignedSalesPerson      = selfAssign;
       assignedOperationsPerson = null;
       createdBy = caller.userId;
       createdAt = Time.now();
@@ -942,6 +1015,161 @@ actor {
       return #err("Unauthorized: admin, backoffice, or operation access required");
     };
     #ok(quotations.values().toArray());
+  };
+
+  // Generate quotation request ID: QR-NNN
+  func nextQuotationRequestId() : Text {
+    let seq = nextQuotationRequestSeq;
+    nextQuotationRequestSeq += 1;
+    "QR-" # padNat(seq);
+  };
+
+  // ─────────────────────────────────────────────
+  //  QUOTATION REQUESTS
+  // ─────────────────────────────────────────────
+
+  /// Sales requests a quotation for a lead. Creates a QuotationRequest with #pending status.
+  /// Does NOT change the lead stage. Adds a remark to the lead.
+  public shared func requestQuotation(
+    sessionToken   : Text,
+    leadId         : Nat,
+    quotationRefId : Text
+  ) : async { #ok : QuotationRequest; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (caller.role != #sales) {
+      return #err("Unauthorized: only sales staff can request quotations");
+    };
+    switch (leadsMap.get(leadId)) {
+      case null { #err("Lead not found") };
+      case (?existing) {
+        if (not canAccessLead(caller.userId, caller.role, existing)) {
+          return #err("Unauthorized: you cannot access this lead");
+        };
+        let reqId = nextQuotationRequestId();
+        let req : QuotationRequest = {
+          id              = reqId;
+          leadId;
+          requestedBy     = caller.userId;
+          requestedByName = caller.name;
+          requestedAt     = Time.now();
+          quotationRefId;
+          status          = #pending;
+          confirmedAt     = null;
+          confirmedBy     = null;
+          confirmedByName = null;
+        };
+        quotationRequests.add(reqId, req);
+        // Add remark to the lead
+        let remarkContent = "Quotation requested by " # caller.name # " - Ref: " # quotationRefId;
+        let remark : Remark = {
+          addedBy = caller.userId;
+          addedAt = Time.now();
+          content = remarkContent;
+        };
+        let updatedRemarks = [remark].concat(existing.remarks);
+        let updatedLead : Lead = {
+          existing with
+          remarks   = updatedRemarks;
+          updatedAt = Time.now();
+        };
+        leadsMap.add(leadId, updatedLead);
+        #ok(req);
+      };
+    };
+  };
+
+  /// Returns all QuotationRequests with #pending status. Accessible by backoffice and admin.
+  public query func getPendingQuotationRequests(
+    sessionToken : Text
+  ) : async { #ok : [QuotationRequest]; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (caller.role != #admin and caller.role != #backoffice) {
+      return #err("Unauthorized: only admin and backoffice can view quotation requests");
+    };
+    #ok(quotationRequests.values().toArray().filter(func(r : QuotationRequest) : Bool {
+      r.status == #pending
+    }));
+  };
+
+  /// Returns all QuotationRequests regardless of status. Accessible by backoffice and admin.
+  public query func getAllQuotationRequests(
+    sessionToken : Text
+  ) : async { #ok : [QuotationRequest]; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (caller.role != #admin and caller.role != #backoffice) {
+      return #err("Unauthorized: only admin and backoffice can view quotation requests");
+    };
+    #ok(quotationRequests.values().toArray());
+  };
+
+  /// Backoffice/admin confirms a quotation request. Sets status to #confirmed,
+  /// moves the lead to #quotationSent, and adds a remark.
+  public shared func confirmQuotationRequest(
+    sessionToken : Text,
+    requestId    : Text
+  ) : async { #ok : QuotationRequest; #err : Text } {
+    let caller = requireSession(sessionToken);
+    if (caller.role != #admin and caller.role != #backoffice) {
+      return #err("Unauthorized: only admin and backoffice can confirm quotation requests");
+    };
+    switch (quotationRequests.get(requestId)) {
+      case null { #err("Quotation request not found") };
+      case (?req) {
+        if (req.status == #confirmed) {
+          return #err("Quotation request is already confirmed");
+        };
+        let confirmed : QuotationRequest = {
+          req with
+          status          = #confirmed;
+          confirmedAt     = ?Time.now();
+          confirmedBy     = ?caller.userId;
+          confirmedByName = ?caller.name;
+        };
+        quotationRequests.add(requestId, confirmed);
+        // Move lead to #quotationSent and add remark
+        switch (leadsMap.get(req.leadId)) {
+          case null {};
+          case (?existing) {
+            let remarkContent = "Quotation confirmed sent by " # caller.name;
+            let remark : Remark = {
+              addedBy = caller.userId;
+              addedAt = Time.now();
+              content = remarkContent;
+            };
+            let updatedRemarks = [remark].concat(existing.remarks);
+            let updatedLead : Lead = {
+              existing with
+              stage     = #quotationSent;
+              remarks   = updatedRemarks;
+              updatedAt = Time.now();
+            };
+            leadsMap.add(req.leadId, updatedLead);
+          };
+        };
+        #ok(confirmed);
+      };
+    };
+  };
+
+  // ─────────────────────────────────────────────
+  //  SALES LEAD GENERATION TOGGLE
+  // ─────────────────────────────────────────────
+
+  /// Returns the current value of the sales lead generation toggle.
+  /// Any authenticated user can read this.
+  public query func getSalesLeadGenerationToggle(sessionToken : Text) : async { #ok : Bool; #err : Text } {
+    ignore requireSession(sessionToken);
+    #ok(allowSalesLeadGeneration);
+  };
+
+  /// Admin-only: enable or disable sales staff from creating and self-assigning their own leads.
+  public shared func setSalesLeadGenerationToggle(
+    sessionToken : Text,
+    enabled      : Bool
+  ) : async { #ok : (); #err : Text } {
+    ignore requireAdmin(sessionToken);
+    allowSalesLeadGeneration := enabled;
+    #ok(());
   };
 
   // ─────────────────────────────────────────────
