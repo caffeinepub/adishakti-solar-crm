@@ -33,6 +33,7 @@ import {
   DEFAULT_DISTRICTS,
   QUOTATION_STATUS_COLORS,
   QUOTATION_STATUS_LABELS,
+  canAssignLeads,
   formatDate,
   formatDateTime,
 } from "../types";
@@ -64,6 +65,7 @@ interface LeadModalProps {
       notes: string;
     };
     notes: string;
+    assignedSalesPerson?: string | null;
   }) => Promise<void>;
 }
 
@@ -150,6 +152,7 @@ export function LeadModal({
           notes: form.reqNotes,
         },
         notes: form.notes,
+        assignedSalesPerson: form.assignedSalesPerson || null,
       });
       toast.success(editLead ? "Lead updated!" : "Lead added!");
       onClose();
@@ -345,6 +348,53 @@ export function LeadModal({
                   </Select>
                 </div>
               </div>
+
+              {/* Admin/Backoffice: assign to a salesperson */}
+              {currentUserRole &&
+                canAssignLeads(currentUserRole) &&
+                !isSalesSelfCreate && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground uppercase mb-1 block">
+                      Assign To Salesperson
+                    </Label>
+                    <Select
+                      value={form.assignedSalesPerson || "__unassigned__"}
+                      onValueChange={(v) =>
+                        set(
+                          "assignedSalesPerson",
+                          v === "__unassigned__" ? "" : v,
+                        )
+                      }
+                    >
+                      <SelectTrigger
+                        className="bg-muted border-border text-foreground"
+                        data-ocid="lead.assign_salesperson.select"
+                      >
+                        <SelectValue placeholder="Unassigned" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover border-border max-h-60 overflow-y-auto">
+                        <SelectItem
+                          value="__unassigned__"
+                          className="text-muted-foreground"
+                        >
+                          — Unassigned —
+                        </SelectItem>
+                        {salesUsers.map((u) => (
+                          <SelectItem
+                            key={u.userId}
+                            value={u.userId}
+                            className="text-foreground hover:bg-muted"
+                          >
+                            {u.name}{" "}
+                            <span className="text-xs text-muted-foreground font-mono">
+                              ({u.userId})
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
               {/* Sales self-create: show locked "Assigned To" field */}
               {isSalesSelfCreate && selfUserName && (

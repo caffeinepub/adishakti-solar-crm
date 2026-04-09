@@ -132,6 +132,7 @@ export function useAddLead() {
       district: string;
       requirements: Requirement;
       notes: string;
+      salesUserId?: string | null;
     }) => {
       if (!actor) throw new Error("Not connected");
       const token = getToken();
@@ -144,6 +145,7 @@ export function useAddLead() {
         params.district,
         params.requirements,
         params.notes,
+        params.salesUserId ?? null,
       );
       if (res.__kind__ === "err") throw new Error(res.err);
       return res.ok;
@@ -167,6 +169,7 @@ export function useUpdateLead() {
       district: string;
       requirements: Requirement;
       notes: string;
+      assignedSalesPerson?: string | null;
     }) => {
       if (!actor) throw new Error("Not connected");
       const token = getToken();
@@ -180,6 +183,7 @@ export function useUpdateLead() {
         params.district,
         params.requirements,
         params.notes,
+        params.assignedSalesPerson ?? null,
       );
       if (res.__kind__ === "err") throw new Error(res.err);
       return res.ok;

@@ -133,10 +133,10 @@ service : {
   _initializeAccessControl: () -> ();
   addLead: (sessionToken: text, customerName: text, phone: text, email: 
    text, address: text, district: text, requirements: Requirement, notes:
-   text) -> (variant {
-               err: text;
-               ok: Lead;
-             });
+   text, salesUserId: opt text) -> (variant {
+                                      err: text;
+                                      ok: Lead;
+                                    });
   addRemark: (sessionToken: text, leadId: nat, content: text) ->
    (variant {
       err: text;
@@ -310,10 +310,11 @@ service : {
     });
   updateLead: (sessionToken: text, leadId: nat, customerName: text, phone:
    text, email: text, address: text, district: text, requirements:
-   Requirement, notes: text) -> (variant {
-                                   err: text;
-                                   ok: Lead;
-                                 });
+   Requirement, notes: text, assignedSalesPerson: opt text) ->
+   (variant {
+      err: text;
+      ok: Lead;
+    });
   updateLeadStage: (sessionToken: text, leadId: nat, stage: PipelineStage,
    notes: text) -> (variant {
                       err: text;

@@ -121,7 +121,17 @@ export type UserRole__1 = { 'admin' : null } |
 export interface _SERVICE {
   '_initializeAccessControl' : ActorMethod<[], undefined>,
   'addLead' : ActorMethod<
-    [string, string, string, string, string, string, Requirement, string],
+    [
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      Requirement,
+      string,
+      [] | [string],
+    ],
     { 'ok' : Lead } |
       { 'err' : string }
   >,
@@ -313,6 +323,7 @@ export interface _SERVICE {
       string,
       Requirement,
       string,
+      [] | [string],
     ],
     { 'ok' : Lead } |
       { 'err' : string }

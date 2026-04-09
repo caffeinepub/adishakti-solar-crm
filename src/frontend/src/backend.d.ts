@@ -126,7 +126,7 @@ export enum UserRole__1 {
     guest = "guest"
 }
 export interface backendInterface {
-    addLead(sessionToken: string, customerName: string, phone: string, email: string, address: string, district: string, requirements: Requirement, notes: string): Promise<{
+    addLead(sessionToken: string, customerName: string, phone: string, email: string, address: string, district: string, requirements: Requirement, notes: string, salesUserId: string | null): Promise<{
         __kind__: "ok";
         ok: Lead;
     } | {
@@ -370,7 +370,7 @@ export interface backendInterface {
         __kind__: "err";
         err: string;
     }>;
-    updateLead(sessionToken: string, leadId: bigint, customerName: string, phone: string, email: string, address: string, district: string, requirements: Requirement, notes: string): Promise<{
+    updateLead(sessionToken: string, leadId: bigint, customerName: string, phone: string, email: string, address: string, district: string, requirements: Requirement, notes: string, assignedSalesPerson: string | null): Promise<{
         __kind__: "ok";
         ok: Lead;
     } | {

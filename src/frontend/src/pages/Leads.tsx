@@ -344,9 +344,16 @@ export default function Leads() {
         onDelete={isAdmin ? (lead) => setDeleteTarget(lead) : undefined}
         onSubmit={async (params) => {
           if (editLead) {
-            await updateLead.mutateAsync({ leadId: editLead.id, ...params });
+            await updateLead.mutateAsync({
+              leadId: editLead.id,
+              ...params,
+              assignedSalesPerson: params.assignedSalesPerson,
+            });
           } else {
-            await addLead.mutateAsync(params);
+            await addLead.mutateAsync({
+              ...params,
+              salesUserId: params.assignedSalesPerson,
+            });
           }
         }}
       />

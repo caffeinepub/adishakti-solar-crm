@@ -612,22 +612,47 @@ actor {
     address       : Text,
     district      : Text,
     requirements  : Requirement,
-    notes         : Text
+    notes         : Text,
+    salesUserId   : ?Text
   ) : async { #ok : Lead; #err : Text } {
     let caller = requireSession(sessionToken);
     // Sales staff can only create leads when the toggle is enabled
     if (caller.role == #sales and not allowSalesLeadGeneration) {
       return #err("Sales lead generation is not enabled");
     };
-    // When a sales user creates a lead, auto-assign themselves
-    let selfAssign : ?Text = if (caller.role == #sales) { ?caller.userId } else { null };
+    // Determine the sales assignment:
+    // 1. Admin/backoffice providing an explicit salesUserId → validate and assign
+    // 2. Sales user creating their own lead → auto-assign to themselves
+    // 3. Otherwise → unassigned
+    let assignedSalesPerson : ?Text = switch (salesUserId) {
+      case (?uid) {
+        if (canAssignLeads(caller.role)) {
+          // Validate the target user exists and has the sales role
+          switch (users.get(uid)) {
+            case null { return #err("Sales user not found") };
+            case (?u) {
+              if (u.role != #sales) {
+                return #err("Target user does not have the sales role");
+              };
+              ?uid;
+            };
+          };
+        } else {
+          // Sales staff cannot specify an arbitrary userId — ignore and self-assign
+          if (caller.role == #sales) { ?caller.userId } else { null };
+        };
+      };
+      case null {
+        if (caller.role == #sales) { ?caller.userId } else { null };
+      };
+    };
     let id = nextLeadId;
     nextLeadId += 1;
     let lead : Lead = {
       id;
       customerName; phone; email; address; district;
       requirements; notes;
-      assignedSalesPerson      = selfAssign;
+      assignedSalesPerson;
       assignedOperationsPerson = null;
       createdBy = caller.userId;
       createdAt = Time.now();
@@ -640,15 +665,16 @@ actor {
   };
 
   public shared func updateLead(
-    sessionToken  : Text,
-    leadId        : Nat,
-    customerName  : Text,
-    phone         : Text,
-    email         : Text,
-    address       : Text,
-    district      : Text,
-    requirements  : Requirement,
-    notes         : Text
+    sessionToken        : Text,
+    leadId              : Nat,
+    customerName        : Text,
+    phone               : Text,
+    email               : Text,
+    address             : Text,
+    district            : Text,
+    requirements        : Requirement,
+    notes               : Text,
+    assignedSalesPerson : ?Text
   ) : async { #ok : Lead; #err : Text } {
     let caller = requireSession(sessionToken);
     switch (leadsMap.get(leadId)) {
@@ -657,10 +683,34 @@ actor {
         if (not canModifyLead(caller.userId, caller.role, existing)) {
           return #err("Unauthorized: you cannot modify this lead");
         };
+        // Resolve the new sales assignment:
+        // Admin/backoffice can update it via the optional param; others leave it unchanged.
+        let newAssignment : ?Text = switch (assignedSalesPerson) {
+          case (?uid) {
+            if (canAssignLeads(caller.role)) {
+              // Validate the target user exists and has the sales role
+              switch (users.get(uid)) {
+                case null { return #err("Sales user not found") };
+                case (?u) {
+                  if (u.role != #sales) {
+                    return #err("Target user does not have the sales role");
+                  };
+                  ?uid;
+                };
+              };
+            } else {
+              existing.assignedSalesPerson; // non-admin/backoffice cannot change assignment
+            };
+          };
+          case null {
+            existing.assignedSalesPerson; // null means "no change"
+          };
+        };
         let updated : Lead = {
           existing with
           customerName; phone; email; address; district;
           requirements; notes;
+          assignedSalesPerson = newAssignment;
           updatedAt = Time.now();
         };
         leadsMap.add(leadId, updated);
